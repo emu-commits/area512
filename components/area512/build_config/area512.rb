@@ -1,6 +1,13 @@
 # Area512 build config: Cardputer (ESP32-S3, no PSRAM), femtoruby (mrubyc) VM only.
 # Build names match LIBMRUBY_PATH in CMakeLists.txt.
-build_name = ENV['AREA512_EXT_DISPLAY'] == 'ON' ? "esp32-femtoruby-captft" : "esp32-femtoruby"
+build_name =
+  if ENV['AREA512_TDECK'] == 'ON'
+    "esp32-femtoruby-tdeck"
+  elsif ENV['AREA512_EXT_DISPLAY'] == 'ON'
+    "esp32-femtoruby-captft"
+  else
+    "esp32-femtoruby"
+  end
 MRuby::CrossBuild.new(build_name) do |conf|
   conf.toolchain("gcc")
 
@@ -25,6 +32,7 @@ MRuby::CrossBuild.new(build_name) do |conf|
   conf.cc.defines << "MAX_SYMBOLS_COUNT=2000"
   conf.cc.defines << "TI_ARENA_SIZE=24576"
   conf.cc.defines << "AREA512_EXT_DISPLAY" if ENV['AREA512_EXT_DISPLAY'] == 'ON'
+  conf.cc.defines << "AREA512_INTERNAL_DISPLAY" if ENV['AREA512_EXT_DISPLAY'] == 'ON' && ENV['AREA512_TDECK'] != 'ON'
   conf.femtoruby(alloc_libc: false)
 
   # Pristine gems from ./R2P2-ESP32; the build root stays the Area512 tree.

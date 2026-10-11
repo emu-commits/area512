@@ -5,6 +5,7 @@
 #include "area512_repl.h"
 #include "python_repl.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #include <mrubyc.h>
@@ -23,7 +24,7 @@ typedef struct {
 static int
 open_python_repl_source(PythonReplSource *repl_source) {
   repl_source->source_text =
-    (char *)mrbc_raw_alloc(PYTHON_REPL_SOURCE_INITIAL_BYTE_CAPACITY);
+    (char *)malloc(PYTHON_REPL_SOURCE_INITIAL_BYTE_CAPACITY);
 
   if (repl_source->source_text == NULL)
     return 0;
@@ -39,7 +40,7 @@ open_python_repl_source(PythonReplSource *repl_source) {
 
 static void
 close_python_repl_source(PythonReplSource *repl_source) {
-  mrbc_raw_free(repl_source->source_text);
+  free(repl_source->source_text);
 }
 
 static void
@@ -90,8 +91,8 @@ append_python_repl_source_line(
   return 1;
 }
 
-static void
-run_python_repl(void) {
+void
+area512_run_python_repl(void *gc_heap, size_t gc_heap_byte_size) {
   int micropython_stack_top;
   PythonReplSource repl_source;
 
@@ -103,15 +104,11 @@ run_python_repl(void) {
     return;
   }
 
-  int open_runtime_result =
-    area512_micropython_open_repl_runtime(&micropython_stack_top);
-
-  if (open_runtime_result != 0) {
-    close_python_repl_source(&repl_source);
-    write_console_line(OUT_OF_MEMORY_MESSAGE);
-
-    return;
-  }
+  area512_micropython_open_repl_runtime(
+    &micropython_stack_top,
+    gc_heap,
+    gc_heap_byte_size
+  );
 
   for (;;) {
     const char *prompt =
@@ -192,7 +189,18 @@ c_python_repl_start(
   (void)virtual_machine;
   (void)ruby_method_argument_count;
 
-  run_python_repl();
+  size_t gc_heap_byte_size = 0;
+  void *gc_heap = area512_micropython_allocate_gc_heap(&gc_heap_byte_size);
+
+  if (gc_heap) {
+    area512_run_python_repl(gc_heap, gc_heap_byte_size);
+
+    free(gc_heap);
+
+  } else {
+    area512_console_reset();
+    write_console_line(OUT_OF_MEMORY_MESSAGE);
+  }
 
   mrbc_decref(ruby_method_arguments);
   mrbc_set_nil(ruby_method_arguments);

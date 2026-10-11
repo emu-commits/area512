@@ -1,5 +1,6 @@
 require 'area512-sprite'
 require 'area512-widget'
+require 'machine'
 require 'io/console'
 
 class WidgetGallery
@@ -24,6 +25,8 @@ class WidgetGallery
       end
     ensure
       @sp.delete if @sp
+      @list.delete if @list
+      @text_view.delete if @text_view
       Display.fill_screen(Widget.theme_background)
     end
   end

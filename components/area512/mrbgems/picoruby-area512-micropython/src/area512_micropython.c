@@ -2,6 +2,8 @@
 
 #include "area512_micropython.h"
 
+#include <stdlib.h>
+
 #include <mrubyc.h>
 
 static void
@@ -41,11 +43,22 @@ c_micropython_compile_python_source_file(
   const char *python_bytecode_path =
     (const char *)ruby_method_arguments[2].string->data;
 
-  int compile_result =
-    area512_micropython_compile_python_source_file(
-      python_source_path,
-      python_bytecode_path
-    );
+  size_t gc_heap_byte_size = 0;
+  void *gc_heap = area512_micropython_allocate_gc_heap(&gc_heap_byte_size);
+
+  int compile_result = -1;
+
+  if (gc_heap) {
+    compile_result =
+      area512_micropython_compile_python_source_file(
+        python_source_path,
+        python_bytecode_path,
+        gc_heap,
+        gc_heap_byte_size
+      );
+
+    free(gc_heap);
+  }
 
   if (compile_result != 0) {
     mrbc_raise(
@@ -91,8 +104,21 @@ c_micropython_run_python_bytecode_file(
   const char *python_bytecode_path =
     (const char *)ruby_method_arguments[1].string->data;
 
-  int run_result =
-    area512_micropython_run_python_bytecode_file(python_bytecode_path);
+  size_t gc_heap_byte_size = 0;
+  void *gc_heap = area512_micropython_allocate_gc_heap(&gc_heap_byte_size);
+
+  int run_result = -1;
+
+  if (gc_heap) {
+    run_result =
+      area512_micropython_run_python_bytecode_file(
+        python_bytecode_path,
+        gc_heap,
+        gc_heap_byte_size
+      );
+
+    free(gc_heap);
+  }
 
   if (run_result != 0) {
     mrbc_raise(
@@ -145,8 +171,22 @@ c_micropython_run_python_manifest(
   const char *manifest_path =
     (const char *)ruby_method_arguments[2].string->data;
 
-  int run_result =
-    area512_micropython_run_python_manifest(directory_path, manifest_path);
+  size_t gc_heap_byte_size = 0;
+  void *gc_heap = area512_micropython_allocate_gc_heap(&gc_heap_byte_size);
+
+  int run_result = -1;
+
+  if (gc_heap) {
+    run_result =
+      area512_micropython_run_python_manifest(
+        directory_path,
+        manifest_path,
+        gc_heap,
+        gc_heap_byte_size
+      );
+
+    free(gc_heap);
+  }
 
   if (run_result != 0) {
     mrbc_raise(

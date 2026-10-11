@@ -1,4 +1,4 @@
-#if defined(AREA512_EXT_DISPLAY) && defined(PICORB_VM_MRUBYC)
+#if defined(AREA512_INTERNAL_DISPLAY) && defined(PICORB_VM_MRUBYC)
 
 #include "area512_markdown.h"
 #include "core/markdown/draw.h"

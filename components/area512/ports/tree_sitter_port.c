@@ -100,3 +100,8 @@ area512_register_tree_sitter_parse_budget(void) {
 
   micropython_ti_set_parse_budget(parse_budget);
 }
+
+void
+area512_clear_tree_sitter_allocation_byte_size(void) {
+  live_allocation_byte_size = 0;
+}

@@ -1,9 +1,11 @@
 // Forked from upstream picoruby-machine's esp32 port to route I/O through
 // the Area512 console: keyboard read, display/input init, and yielding the
 // input drain to a foreground session (e.g. Filer).
+#include "area512_sandbox.h"
 #include "hal.h"
 #include "io-console.h"
 #include "machine.h"
+#include "machine_port.h"
 #include "ringbuffer.h"
 #include <stdbool.h>
 
@@ -112,6 +114,7 @@ advance_picorb_tick(void *argument) {
   (void)argument;
 
   picorb_tick();
+  area512_terminate_sandbox_on_signal();
 }
 
 void
@@ -125,14 +128,20 @@ picorb_hal_init(void) {
 
   esp_timer_create(&timer_create_args, &s_periodic_timer);
   esp_timer_start_periodic(s_periodic_timer, MRBC_TICK_UNIT * 1000);
+}
 
-  // Order matters: display (M5.begin) must run before input (keyboard relies
-  // on M5's I2C bus brought up by M5.begin).
+void
+area512_start_console(void) {
+  // Order matters: display must run before input. Cardputer's keyboard relies
+  // on M5's I2C bus brought up by M5.begin; T-Deck's keyboard needs the
+  // peripheral power turned on by area512_display_init.
   area512_display_init();
 
-  // After M5.begin, which probes the panel on SPI2 and frees it again, and
-  // before the splash, which draws in the theme colors. Ruby mounts again
-  // later; unmounting here leaves that mount the only reference.
+  // After area512_display_init, which leaves SPI2 free for the SD card (M5.begin
+  // probes the panel and frees it again; the 320x240 display initializes the
+  // shared bus), and before the splash, which draws in the theme colors. The
+  // Filer mounts again later; unmounting here leaves that mount the only
+  // reference.
   if (area512_sd_mount("/sdcard") == 0) {
     area512_theme_load();
     area512_default_ui_load();

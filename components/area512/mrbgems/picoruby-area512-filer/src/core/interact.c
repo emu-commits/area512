@@ -51,9 +51,9 @@ confirm_installed_app_action(Filer *filer, const char *verb) {
   return read_yes_no_confirmation(filer, question);
 }
 
-// Interaction loop; returns an action code when Ruby work is needed. Single
-// exit so c_filer_run can wrap the whole loop in one foreground input
-// session.
+// Interaction loop; returns an action code when filer_shell.c work is needed.
+// Single exit so read_filer_action can wrap the whole loop in one foreground
+// input session.
 int
 run_filer_interaction(Filer *filer) {
   for (;;) {

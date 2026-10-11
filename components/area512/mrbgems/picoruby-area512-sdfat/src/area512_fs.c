@@ -1,4 +1,4 @@
-// Minimal libc-backed File/Dir for main_task.rb, require.rb and Sandbox;
+// Minimal libc-backed File/Dir for Ruby apps, require.rb and Sandbox;
 // Ruby-visible paths are rooted at AREA512_DATA_ROOT ("/" == the data root).
 
 #include <stdint.h>

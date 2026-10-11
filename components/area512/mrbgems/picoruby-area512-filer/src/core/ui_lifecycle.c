@@ -4,6 +4,7 @@
 
 #include "area512_hal.h"
 #include "core/filer.h"
+#include "io-console.h"
 
 void
 area512_filer_setup_ui(Filer *filer) {
@@ -28,6 +29,21 @@ area512_filer_teardown_ui(Filer *filer) {
     area512_sprite_delete(filer->row);
     filer->row = 0;
   }
+}
+
+int
+read_filer_action(Filer *filer) {
+  area512_filer_setup_ui(filer);
+  clamp_index(filer);
+
+  // Raw so Ctrl-C/Ctrl-Z reach the filer as bytes instead of becoming signals.
+  io_raw_bang(false);
+
+  int action = run_filer_interaction(filer);
+
+  io_cooked_bang();
+
+  return action;
 }
 
 #endif

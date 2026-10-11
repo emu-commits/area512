@@ -43,6 +43,9 @@ class WidgetList
   # Draw rows, selection, marks, and the scrollbar when needed
   def draw: ((Sprite | BandedSprite) sprite) -> nil
 
+  # Free the list memory immediately
+  def delete: () -> nil
+
   # Create an empty list (capacity 128 rows)
   def self.new: () -> WidgetList
 

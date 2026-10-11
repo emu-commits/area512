@@ -23,14 +23,16 @@ int area512_console_getch_timeout(int timeout_ms);
 void area512_console_write(const void *buffer, int buffer_byte_count);
 void area512_console_reset(void);
 int area512_console_had_output(void);
+void area512_console_wait_key_if_output(void);
 int area512_console_cursor_row_index(void);
 int area512_console_row_height(void);
 int area512_console_font_size(void);
 
 int area512_metrics_battery_percent(void);
-int area512_metrics_vm_used_pct(void);
 int area512_metrics_dram_used_pct(void);
 int area512_metrics_stack_used_pct(void);
+int area512_metrics_dram_free_byte_size(void);
+int area512_metrics_stack_free_byte_size(void);
 
 void *area512_sprite_new(int w, int h);
 void *area512_sprite_new_with_font_size(int w, int h, int font_size);
@@ -122,6 +124,14 @@ int area512_seed_update(void);
 const uint8_t *area512_seed_find_file(const char *path, size_t *size);
 bool area512_ensure_directory(const char *path);
 bool area512_ensure_parent_directories(char *full_path);
+
+char *area512_split_next_manifest_entry(char **manifest_cursor);
+void area512_join_manifest_entry_path(
+  const char *directory_path,
+  const char *entry_name,
+  char *entry_path,
+  int entry_path_size
+);
 
 void area512_usb_receive_files(void);
 bool area512_usb_receive_owns_rxfifo(void);

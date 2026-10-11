@@ -4,6 +4,8 @@
 
 #include "core/filer.h"
 
+#include <sys/stat.h>
+
 #define TERMINAL_OUTPUT_ROW_CAPACITY 10
 #define TERMINAL_HISTORY_LINE_CAPACITY 5
 #define TERMINAL_CONTENT_LEFT_X 2
@@ -59,6 +61,8 @@ void expand_tilde(
   char *expanded_path,
   int expanded_path_capacity
 );
+
+int stat_data_path(const char *absolute_path, struct stat *stat_buffer);
 
 int resolve_target_path(
   const char *current_directory,

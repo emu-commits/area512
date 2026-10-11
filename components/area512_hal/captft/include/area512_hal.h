@@ -19,6 +19,7 @@ void area512_sprite_round_rect(
 void area512_gfx_set_window(int x, int y, int width, int height);
 void area512_gfx_show_bitmap(const void *bitmap, int line_delay_milliseconds);
 
+#ifdef AREA512_INTERNAL_DISPLAY
 // Pair each successful begin with end. The panel keeps its contents after end.
 int area512_internal_display_begin(void);
 void area512_internal_display_end(void);
@@ -40,3 +41,4 @@ void area512_internal_display_text(
   uint32_t foreground,
   uint32_t background
 );
+#endif

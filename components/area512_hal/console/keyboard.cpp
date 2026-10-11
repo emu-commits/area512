@@ -40,7 +40,7 @@ static constexpr uint8_t ASCII_BACKSPACE = 0x08;
 static constexpr uint8_t ASCII_ESCAPE = 0x1B;
 static constexpr uint8_t ASCII_DELETE = 0x7F;
 
-#ifdef AREA512_EXT_DISPLAY
+#ifdef AREA512_INTERNAL_DISPLAY
 static constexpr char NEXT_PAGE_CHARACTER = 'j';
 static constexpr char PREVIOUS_PAGE_CHARACTER = 'k';
 
@@ -652,7 +652,7 @@ cardputer_handle_key(uint8_t code, bool pressed) {
   char unshifted_character = key.character;
 
   if (is_cardputer_fn_pressed) {
-#ifdef AREA512_EXT_DISPLAY
+#ifdef AREA512_INTERNAL_DISPLAY
     if (unshifted_character == NEXT_PAGE_CHARACTER) {
       show_next_internal_markdown_page();
 

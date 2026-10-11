@@ -1,3 +1,4 @@
+require 'area512-sprite'
 require 'area512-sdfat'
 
 class Calc

@@ -5,6 +5,8 @@
 #if defined(PICORB_VM_MRUBYC)
 
 #include "area512_hal.h"
+#include "area512_sandbox.h"
+#include "machine.h"
 
 #include <errno.h>
 #include <stddef.h>
@@ -42,6 +44,11 @@ typedef struct area512_held_irep {
 // release_kept_code() once the task no longer needs them.
 static Area512HeldCode *s_held_codes = NULL;
 static Area512HeldIrep *s_held_ireps = NULL;
+
+static uint8_t *s_suspend_vm_code = NULL;
+static SandboxState *volatile s_running_sandbox_state = NULL;
+static volatile bool s_is_signal_self_managed = false;
+static volatile int s_terminating_signal_status = MACHINE_SIG_NONE;
 
 #define SANDBOX_STATE()                                                        \
   SandboxState *sandbox_state = (SandboxState *)v->instance->data
@@ -98,18 +105,23 @@ release_kept_code(SandboxState *sandbox_state) {
 }
 
 static uint8_t *
-read_whole_file(mrbc_vm *virtual_machine, const char *path, size_t *size) {
+read_whole_file(
+  const char *path,
+  size_t *size,
+  const char **exception_message
+) {
+
   char full_path[AREA512_PATH_MAX];
 
   if (area512_resolve_data_path(path, full_path, sizeof full_path) != 0) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "invalid path");
+    *exception_message = "invalid path";
     return NULL;
   }
 
   FILE *file = fopen(full_path, "rb");
 
   if (!file) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), strerror(errno));
+    *exception_message = strerror(errno);
     return NULL;
   }
 
@@ -121,7 +133,7 @@ read_whole_file(mrbc_vm *virtual_machine, const char *path, size_t *size) {
 
   if (file_size < 0 || fseek(file, 0, SEEK_SET) != 0) {
     fclose(file);
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), strerror(errno));
+    *exception_message = strerror(errno);
 
     return NULL;
   }
@@ -129,7 +141,7 @@ read_whole_file(mrbc_vm *virtual_machine, const char *path, size_t *size) {
   uint8_t *buffer = (uint8_t *)mrbc_raw_alloc((unsigned int)file_size + 1);
   if (!buffer) {
     fclose(file);
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "out of memory");
+    *exception_message = "out of memory";
 
     return NULL;
   }
@@ -140,7 +152,7 @@ read_whole_file(mrbc_vm *virtual_machine, const char *path, size_t *size) {
 
   if (read_size != (size_t)file_size) {
     mrbc_raw_free(buffer);
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "read failed");
+    *exception_message = "read failed";
 
     return NULL;
   }
@@ -153,19 +165,15 @@ read_whole_file(mrbc_vm *virtual_machine, const char *path, size_t *size) {
 
 static int
 execute_mrb_code_keep(
-  mrbc_vm *virtual_machine,
   SandboxState *sandbox_state,
   uint8_t *code,
-  size_t size
+  size_t size,
+  const char **exception_message
 ) {
 
   // RITE0400: mruby bytecode container, format version 4.0.
   if (size < 12 || memcmp(code, "RITE0400", 8) != 0) {
-    mrbc_raise(
-      virtual_machine,
-      MRBC_CLASS(RuntimeError),
-      "not a valid mrb file"
-    );
+    *exception_message = "not a valid mrb file";
 
     return 0;
   }
@@ -174,7 +182,7 @@ execute_mrb_code_keep(
     (Area512HeldCode *)mrbc_raw_alloc(sizeof(Area512HeldCode));
 
   if (!held_code) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "out of memory");
+    *exception_message = "out of memory";
 
     return 0;
   }
@@ -192,7 +200,7 @@ execute_mrb_code_keep(
 
     if (!held_irep) {
       mrbc_raw_free(held_code);
-      mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "out of memory");
+      *exception_message = "out of memory";
 
       return 0;
     }
@@ -253,17 +261,27 @@ c_sandbox_area512_exec_mrb_file_keep(
 
   const char *path = (const char *)v[1].string->data;
   size_t size = 0;
-  uint8_t *code = read_whole_file(virtual_machine, path, &size);
+  const char *exception_message = NULL;
+  uint8_t *code = read_whole_file(path, &size, &exception_message);
 
-  if (!code)
+  if (!code) {
+    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), exception_message);
     return;
-
-  if (execute_mrb_code_keep(virtual_machine, sandbox_state, code, size)) {
-    SET_TRUE_RETURN();
-  } else {
-    mrbc_raw_free(code);
-    SET_FALSE_RETURN();
   }
+
+  if (execute_mrb_code_keep(sandbox_state, code, size, &exception_message)) {
+    SET_TRUE_RETURN();
+    return;
+  }
+
+  mrbc_raw_free(code);
+
+  if (exception_message) {
+    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), exception_message);
+    return;
+  }
+
+  SET_FALSE_RETURN();
 }
 
 static void
@@ -303,6 +321,13 @@ c_sandbox_area512_release_mrc_irep(
   SET_NIL_RETURN();
 }
 
+static const char *
+describe_sandbox_exception(const mrbc_exception *exception) {
+  return exception->message
+    ? (const char *)exception->message
+    : mrbc_symid_to_str(exception->cls->sym_id);
+}
+
 static void
 c_sandbox_area512_exception_message(
   mrbc_vm *virtual_machine,
@@ -322,14 +347,300 @@ c_sandbox_area512_exception_message(
     return;
   }
 
-  const mrbc_exception *exception =
-    sandbox_virtual_machine->exception.exception;
-
-  const char *message = exception->message
-    ? (const char *)exception->message
-    : mrbc_symid_to_str(exception->cls->sym_id);
+  const char *message =
+    describe_sandbox_exception(sandbox_virtual_machine->exception.exception);
 
   SET_RETURN(mrbc_string_new_cstr(virtual_machine, message));
+}
+
+static uint8_t *
+compile_suspend_vm_code(void) {
+  mrc_ccontext *context = mrc_ccontext_new(NULL);
+
+  if (!context)
+    return NULL;
+
+  const uint8_t *script = (const uint8_t *)"Task.current.suspend";
+  size_t script_byte_size = strlen((const char *)script);
+  mrc_irep *irep = mrc_load_string_cxt(context, &script, script_byte_size);
+  uint8_t *vm_code = NULL;
+  size_t vm_code_byte_size = 0;
+  int dump_result = MRC_DUMP_GENERAL_FAILURE;
+
+  if (irep) {
+    dump_result =
+      mrc_dump_irep(context, irep, 0, &vm_code, &vm_code_byte_size);
+
+    mrc_irep_free(context, irep);
+  }
+
+  if (context->options)
+    pm_options_free(context->options);
+
+  mrc_ccontext_free(context);
+
+  return dump_result == MRC_DUMP_OK ? vm_code : NULL;
+}
+
+static bool
+start_sandbox_task(SandboxState *sandbox_state, const char *task_name) {
+  if (!s_suspend_vm_code)
+    s_suspend_vm_code = compile_suspend_vm_code();
+
+  if (!s_suspend_vm_code)
+    return false;
+
+  sandbox_state->tcb =
+    mrbc_tcb_new(
+      MAX_REGS_SIZE,
+      MRBC_TASK_DEFAULT_STATE,
+      MRBC_TASK_DEFAULT_PRIORITY
+    );
+
+  mrbc_create_task(s_suspend_vm_code, sandbox_state->tcb);
+  sandbox_state->tcb->vm.flag_permanence = 1;
+  mrbc_set_task_name(sandbox_state->tcb, task_name);
+
+  return true;
+}
+
+static void
+c_sandbox_new(mrbc_vm *virtual_machine, mrbc_value *v, int argument_count) {
+  mrbc_value sandbox =
+    mrbc_instance_new(virtual_machine, v->cls, sizeof(SandboxState));
+
+  SandboxState *sandbox_state = (SandboxState *)sandbox.instance->data;
+  memset(sandbox_state, 0, sizeof(SandboxState));
+
+  const char *task_name =
+    argument_count == 0 ? "sandbox" : (const char *)GET_STRING_ARG(1);
+
+  if (!start_sandbox_task(sandbox_state, task_name)) {
+    mrbc_raise(
+      virtual_machine,
+      MRBC_CLASS(RuntimeError),
+      "failed to compile suspend_vm_code"
+    );
+
+    return;
+  }
+
+  SET_RETURN(sandbox);
+}
+
+static void
+c_machine_signal_self_manage(
+  mrbc_vm *virtual_machine,
+  mrbc_value *v,
+  int argument_count
+) {
+
+  (void)virtual_machine;
+  (void)argument_count;
+
+  s_is_signal_self_managed = true;
+
+  mrbc_value signal_self_manage_value = mrbc_true_value();
+
+  mrbc_set_global(
+    mrbc_str_to_symid("$_signal_self_manage"),
+    &signal_self_manage_value
+  );
+
+  SET_TRUE_RETURN();
+}
+
+SandboxState *
+area512_open_sandbox(const char *task_name) {
+  s_is_signal_self_managed = false;
+  s_terminating_signal_status = MACHINE_SIG_NONE;
+
+  SandboxState *sandbox_state =
+    (SandboxState *)mrbc_raw_alloc(sizeof(SandboxState));
+
+  if (!sandbox_state)
+    return NULL;
+
+  memset(sandbox_state, 0, sizeof(SandboxState));
+
+  if (!start_sandbox_task(sandbox_state, task_name)) {
+    mrbc_raw_free(sandbox_state);
+
+    return NULL;
+  }
+
+  return sandbox_state;
+}
+
+int
+area512_run_sandbox_mrb_file(
+  SandboxState *sandbox_state,
+  const char *mrb_path,
+  char *exception_message,
+  int exception_message_size,
+  const char **exception_class_name
+) {
+
+  mrbc_vm *sandbox_virtual_machine = (mrbc_vm *)&sandbox_state->tcb->vm;
+  size_t size = 0;
+  const char *load_exception_message = NULL;
+  uint8_t *code = read_whole_file(mrb_path, &size, &load_exception_message);
+
+  if (
+    code &&
+    !execute_mrb_code_keep(sandbox_state, code, size, &load_exception_message)
+  ) {
+
+    mrbc_raw_free(code);
+    code = NULL;
+  }
+
+  if (!code) {
+    if (load_exception_message) {
+      snprintf(
+        exception_message,
+        exception_message_size,
+        "%s",
+        load_exception_message
+      );
+
+      *exception_class_name = "RuntimeError";
+
+    } else {
+      const mrbc_exception *exception =
+        sandbox_virtual_machine->exception.exception;
+
+      snprintf(
+        exception_message,
+        exception_message_size,
+        "%s",
+        describe_sandbox_exception(exception)
+      );
+
+      *exception_class_name = mrbc_symid_to_str(exception->cls->sym_id);
+    }
+
+    return AREA512_SANDBOX_RUN_LOAD_FAILED;
+  }
+
+  s_running_sandbox_state = sandbox_state;
+  mrbc_run();
+  s_running_sandbox_state = NULL;
+
+  if (s_terminating_signal_status != MACHINE_SIG_NONE) {
+    if (s_terminating_signal_status == MACHINE_SIGINT_RECEIVED)
+      mrbc_printf("^C\n");
+
+    return AREA512_SANDBOX_RUN_INTERRUPTED;
+  }
+
+  if (mrbc_israised(sandbox_virtual_machine)) {
+    const mrbc_exception *exception =
+      sandbox_virtual_machine->exception.exception;
+
+    snprintf(
+      exception_message,
+      exception_message_size,
+      "%s",
+      describe_sandbox_exception(exception)
+    );
+
+    *exception_class_name = mrbc_symid_to_str(exception->cls->sym_id);
+
+    return AREA512_SANDBOX_RUN_RAISED;
+  }
+
+  return AREA512_SANDBOX_RUN_COMPLETED;
+}
+
+int
+area512_run_sandbox_manifest(
+  SandboxState *sandbox_state,
+  const char *directory_path,
+  const char *manifest_path,
+  char *exception_message,
+  int exception_message_size,
+  const char **exception_class_name
+) {
+
+  size_t manifest_byte_size = 0;
+  const char *load_exception_message = NULL;
+
+  char *manifest_text =
+    (char *)read_whole_file(
+      manifest_path,
+      &manifest_byte_size,
+      &load_exception_message
+    );
+
+  if (!manifest_text) {
+    snprintf(
+      exception_message,
+      exception_message_size,
+      "%s",
+      load_exception_message
+    );
+
+    *exception_class_name = "RuntimeError";
+
+    return AREA512_SANDBOX_RUN_LOAD_FAILED;
+  }
+
+  char *manifest_cursor = manifest_text;
+  char *entry_name;
+  char entry_path[AREA512_PATH_MAX];
+  int run_result = AREA512_SANDBOX_RUN_COMPLETED;
+
+  while (
+    run_result == AREA512_SANDBOX_RUN_COMPLETED &&
+    (entry_name = area512_split_next_manifest_entry(&manifest_cursor)) != NULL
+  ) {
+
+    area512_join_manifest_entry_path(
+      directory_path,
+      entry_name,
+      entry_path,
+      sizeof entry_path
+    );
+
+    run_result =
+      area512_run_sandbox_mrb_file(
+        sandbox_state,
+        entry_path,
+        exception_message,
+        exception_message_size,
+        exception_class_name
+      );
+  }
+
+  mrbc_raw_free(manifest_text);
+
+  return run_result;
+}
+
+void
+area512_clear_sandbox_pointers(void) {
+  s_suspend_vm_code = NULL;
+  s_held_codes = NULL;
+  s_held_ireps = NULL;
+  s_running_sandbox_state = NULL;
+}
+
+void
+area512_terminate_sandbox_on_signal(void) {
+  if (!s_running_sandbox_state || s_is_signal_self_managed)
+    return;
+
+  if (
+    sigint_status != MACHINE_SIGINT_RECEIVED &&
+    sigint_status != MACHINE_SIGTSTP_RECEIVED
+  )
+    return;
+
+  s_terminating_signal_status = sigint_status;
+  sigint_status = MACHINE_SIG_NONE;
+
+  mrbc_terminate_task(s_running_sandbox_state->tcb);
 }
 
 void
@@ -338,6 +649,19 @@ mrbc_area512_sandbox_init(mrbc_vm *virtual_machine) {
 
   if (!class_Sandbox)
     return;
+
+  mrbc_define_method(virtual_machine, class_Sandbox, "new", c_sandbox_new);
+
+  mrbc_class *module_Machine = mrbc_get_class_by_name("Machine");
+
+  if (module_Machine) {
+    mrbc_define_method(
+      virtual_machine,
+      module_Machine,
+      "signal_self_manage",
+      c_machine_signal_self_manage
+    );
+  }
 
   mrbc_define_method(
     virtual_machine,

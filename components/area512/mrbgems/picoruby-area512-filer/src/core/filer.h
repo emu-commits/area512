@@ -1,6 +1,6 @@
 // Core filer declarations: layout constants, the filer state struct, and
-// the ACTION_* codes run() returns to the Ruby shell (must stay in sync with
-// the Ruby side). VM-independent: no mruby/c here.
+// the ACTION_* codes read_filer_action() returns to filer_shell.c.
+// VM-independent: no mruby/c here.
 #pragma once
 
 #include <stdint.h>
@@ -119,6 +119,7 @@ void add_entry_in_order(
   const FileEntry *entry
 );
 
+int has_path_suffix(const char *path, const char *suffix);
 int is_ruby_file_path(const char *file_path);
 int is_python_file_path(const char *file_path);
 int is_markdown_file_path(const char *file_path);
@@ -159,4 +160,5 @@ void build_delete_question(
 int read_text_input(Filer *filer, const char *label);
 int read_yes_no_confirmation(Filer *filer, const char *question);
 int run_filer_interaction(Filer *filer);
+int read_filer_action(Filer *filer);
 void draw_all(Filer *filer);

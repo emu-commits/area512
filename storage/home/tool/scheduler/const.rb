@@ -1,4 +1,5 @@
 require 'area512-widget'
+require 'machine'
 require 'io/console'
 require 'area512-sprite'
 require 'area512-sdfat'

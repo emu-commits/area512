@@ -5,7 +5,9 @@ set(PURE_PICORUBY ${COMPONENT_DIR}/../../R2P2-ESP32/components/picoruby-esp32/pi
 
 set(MRUBY_CONFIG_STRING "${COMPONENT_DIR}/build_config/area512.rb")
 set(LIBMRUBY_PATH "esp32-femtoruby")
-if(AREA512_EXT_DISPLAY)
+if(AREA512_TDECK)
+  set(LIBMRUBY_PATH "esp32-femtoruby-tdeck")
+elseif(AREA512_EXT_DISPLAY)
   set(LIBMRUBY_PATH "esp32-femtoruby-captft")
 endif()
 file(MAKE_DIRECTORY ${PURE_PICORUBY}/build/${LIBMRUBY_PATH}/mrbgems)
@@ -21,13 +23,22 @@ set(ADDITIONAL_DEFINITIONS
   -DPICORB_VM_MRUBYC
 )
 
-if(DEFINED ENV{HEAP_SIZE})
-  list(APPEND ADDITIONAL_DEFINITIONS -DHEAP_SIZE=$ENV{HEAP_SIZE})
+set(AREA512_FILER_INCLUDE_DIRS ${COMPONENT_DIR}/mrbgems/picoruby-area512-filer/src)
+if(AREA512_EXT_DISPLAY)
+  list(
+    PREPEND
+    AREA512_FILER_INCLUDE_DIRS
+    ${COMPONENT_DIR}/mrbgems/picoruby-area512-filer/captft/src
+  )
 endif()
 
 idf_component_register(
   SRCS
     ${COMPONENT_DIR}/area512.c
+    ${COMPONENT_DIR}/area512_arena.c
+    ${COMPONENT_DIR}/area512_shared_stack.c
+    ${COMPONENT_DIR}/area512_ruby_vm.c
+    ${COMPONENT_DIR}/filer_shell.c
     ${COMPONENT_DIR}/ports/tree_sitter_port.c
     # esp32 machine port forked here for console (screen+keyboard) integration.
     ${COMPONENT_DIR}/ports/machine_port.c
@@ -52,6 +63,13 @@ idf_component_register(
     ${ADDITIONAL_INCLUDE_DIRS}
   PRIV_INCLUDE_DIRS
     ${COMPONENT_DIR}/mrbgems/micropython-ti/include
+    ${COMPONENT_DIR}/mrbgems/picoruby-area512-sandbox/src
+    ${COMPONENT_DIR}/mrbgems/picoruby-area512-compile/src
+    ${COMPONENT_DIR}/mrbgems/picoruby-area512-edit/src
+    ${COMPONENT_DIR}/mrbgems/picoruby-area512-dot/src
+    ${COMPONENT_DIR}/mrbgems/picoruby-area512-repl/src
+    ${AREA512_FILER_INCLUDE_DIRS}
+    ${PURE_PICORUBY}/mrbgems/picoruby-watchdog/include
   PRIV_REQUIRES
     esp_driver_gpio
     esp_driver_i2c
@@ -64,6 +82,13 @@ idf_component_register(
     area512_hal
     area512_micropython
     area512_tree_sitter
+)
+
+# Status line messages are cut to MESSAGE_MAX on purpose, like the Ruby
+# filer's copy_string did.
+set_source_files_properties(
+  ${COMPONENT_DIR}/filer_shell.c
+  PROPERTIES COMPILE_OPTIONS "-Wno-format-truncation"
 )
 
 add_definitions(
@@ -83,6 +108,7 @@ set(MRUBY_ENV
   MRUBY_CONFIG=${MRUBY_CONFIG_STRING}
   CONFIG_IDF_TARGET=${CONFIG_IDF_TARGET}
   AREA512_EXT_DISPLAY=${AREA512_EXT_DISPLAY}
+  AREA512_TDECK=${AREA512_TDECK}
 )
 
 # Build PicoRuby
@@ -124,7 +150,7 @@ add_custom_target(
 add_dependencies(${COMPONENT_LIB} ${CUSTOM_TARGET_NAME})
 
 # Compile Ruby files
-set(RUBY_FILES main_task)
+set(RUBY_FILES environment_task irb_task)
 set(PICORBC ${PURE_PICORUBY}/bin/picorbc)
 set(GENERATED_C_FILES "")
 

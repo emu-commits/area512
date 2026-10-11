@@ -1,5 +1,6 @@
 #if defined(PICORB_VM_MRUBYC)
 
+#include "area512_edit.h"
 #include "area512_markdown.h"
 #include "core/editor.h"
 #include "core/text/utf8.h"
@@ -13,6 +14,7 @@
 #include <mrubyc.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
   Vim *core;
@@ -24,19 +26,19 @@ get_session(mrbc_value *values) {
   return *(editor_session **)values->instance->data;
 }
 
-static void
-c_vim_new(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
+static editor_session *
+open_editor_session(
+  const char *path,
+  int path_byte_length,
+  const char **exception_message
+) {
 
   editor_session *session = (editor_session *)malloc(sizeof(editor_session));
 
   if (!session) {
-    mrbc_raise(
-      virtual_machine,
-      MRBC_CLASS(RuntimeError),
-      "failed to allocate Vim"
-    );
+    *exception_message = "failed to allocate Vim";
 
-    return;
+    return NULL;
   }
 
   session->core = NULL;
@@ -48,13 +50,9 @@ c_vim_new(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
   if (!core) {
     free(session);
 
-    mrbc_raise(
-      virtual_machine,
-      MRBC_CLASS(RuntimeError),
-      "failed to allocate Vim"
-    );
+    *exception_message = "failed to allocate Vim";
 
-    return;
+    return NULL;
   }
 
   session->core = core;
@@ -66,12 +64,7 @@ c_vim_new(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
 
   core->screen.highlight = highlight_visible_row_text;
 
-  if (argument_count >= 1 && mrbc_type(values[1]) == MRBC_TT_STRING &&
-      values[1].string->size > 0) {
-
-    const char *path = (const char *)values[1].string->data;
-    int path_byte_length = values[1].string->size;
-
+  if (path && path_byte_length > 0) {
     vim_set_filepath(core, path, path_byte_length);
 
     VimString content;
@@ -84,30 +77,11 @@ c_vim_new(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
     vim_string_free(&content);
   }
 
-  mrbc_value instance =
-    mrbc_instance_new(virtual_machine, values->cls, sizeof(editor_session *));
-
-  *(editor_session **)instance.instance->data = session;
-
-  mrbc_decref(values);
-
-  values[0] = instance;
+  return session;
 }
 
 static void
-c_vim_start(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
-
-  (void)virtual_machine;
-  (void)argument_count;
-
-  editor_session *session = get_session(values);
-
-  if (!session || !session->core) {
-    mrbc_decref(values);
-    mrbc_set_nil(values);
-    return;
-  }
-
+run_editor_session(editor_session *session) {
   Vim *core = session->core;
   session->canvas.char_width = EDIT_CHAR_WIDTH;
   session->canvas.row_height = EDIT_ROW_HEIGHT;
@@ -218,6 +192,78 @@ c_vim_start(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
   core->active_canvas = NULL;
 
   io_cooked_bang();
+}
+
+static void
+close_editor_session(editor_session *session) {
+  if (session->canvas.row_sprite)
+    area512_sprite_delete(session->canvas.row_sprite);
+
+  if (session->canvas.cursor_sprite)
+    area512_sprite_delete(session->canvas.cursor_sprite);
+
+  if (session->core) {
+    vim_free(session->core);
+    free(session->core);
+  }
+
+  free(session);
+}
+
+int
+area512_edit_file(const char *path, const char **exception_message) {
+  editor_session *session =
+    open_editor_session(path, (int)strlen(path), exception_message);
+
+  if (!session)
+    return -1;
+
+  run_editor_session(session);
+  close_editor_session(session);
+
+  return 0;
+}
+
+static void
+c_vim_new(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
+  const char *path = NULL;
+  int path_byte_length = 0;
+  const char *exception_message = NULL;
+
+  if (argument_count >= 1 && mrbc_type(values[1]) == MRBC_TT_STRING) {
+    path = (const char *)values[1].string->data;
+    path_byte_length = values[1].string->size;
+  }
+
+  editor_session *session =
+    open_editor_session(path, path_byte_length, &exception_message);
+
+  if (!session) {
+    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), exception_message);
+
+    return;
+  }
+
+  mrbc_value instance =
+    mrbc_instance_new(virtual_machine, values->cls, sizeof(editor_session *));
+
+  *(editor_session **)instance.instance->data = session;
+
+  mrbc_decref(values);
+
+  values[0] = instance;
+}
+
+static void
+c_vim_start(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
+
+  (void)virtual_machine;
+  (void)argument_count;
+
+  editor_session *session = get_session(values);
+
+  if (session && session->core)
+    run_editor_session(session);
 
   mrbc_decref(values);
   mrbc_set_nil(values);
@@ -227,20 +273,8 @@ static void
 mrbc_vim_free(mrbc_value *self) {
   editor_session *session = *(editor_session **)self->instance->data;
 
-  if (session) {
-    if (session->canvas.row_sprite)
-      area512_sprite_delete(session->canvas.row_sprite);
-
-    if (session->canvas.cursor_sprite)
-      area512_sprite_delete(session->canvas.cursor_sprite);
-
-    if (session->core) {
-      vim_free(session->core);
-      free(session->core);
-    }
-
-    free(session);
-  }
+  if (session)
+    close_editor_session(session);
 }
 
 void

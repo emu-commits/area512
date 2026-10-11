@@ -1,4 +1,6 @@
+require 'machine'
 require 'io/console'
+require 'area512-sprite'
 require 'area512-sdfat'
 
 def read_key

@@ -5,6 +5,7 @@ MRuby::Gem::Specification.new('picoruby-area512-filer') do |spec|
 
   spec.add_dependency 'picoruby-io-console'
   spec.cc.include_paths << "#{spec.dir}/../../../area512_hal/include"
+  spec.cc.include_paths << "#{spec.dir}/../.."
 
   # mruby's default source glob is non-recursive; pick up src/ subdirectories.
   if ENV['AREA512_EXT_DISPLAY'] == 'ON'

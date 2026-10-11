@@ -118,7 +118,7 @@ add_entry_in_order(
   (*entry_count)++;
 }
 
-static int
+int
 has_path_suffix(const char *path, const char *suffix) {
   size_t path_byte_length = strlen(path);
   size_t suffix_byte_length = strlen(suffix);

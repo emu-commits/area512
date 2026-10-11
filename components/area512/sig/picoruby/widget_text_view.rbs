@@ -19,6 +19,9 @@ class WidgetTextView
   # Draw word-wrapped text and the scrollbar when needed
   def draw: ((Sprite | BandedSprite) sprite) -> nil
 
+  # Free the text view memory immediately
+  def delete: () -> nil
+
   # Create an empty text view
   def self.new: () -> WidgetTextView
 

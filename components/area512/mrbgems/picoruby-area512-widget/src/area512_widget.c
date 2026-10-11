@@ -1241,6 +1241,18 @@ free_widget_list(mrbc_value *self) {
 }
 
 static void
+c_widget_list_delete(
+  mrbc_vm *virtual_machine,
+  mrbc_value *v,
+  int argument_count
+) {
+
+  free(get_widget_list(v));
+  *(WidgetList **)v->instance->data = NULL;
+  SET_NIL_RETURN();
+}
+
+static void
 c_widget_list_new(mrbc_vm *virtual_machine, mrbc_value *v, int argument_count) {
 
   (void)argument_count;
@@ -1499,6 +1511,18 @@ get_widget_text_view(mrbc_value *self) {
 static void
 free_widget_text_view(mrbc_value *self) {
   free(get_widget_text_view(self));
+}
+
+static void
+c_widget_text_view_delete(
+  mrbc_vm *virtual_machine,
+  mrbc_value *v,
+  int argument_count
+) {
+
+  free(get_widget_text_view(v));
+  *(WidgetTextView **)v->instance->data = NULL;
+  SET_NIL_RETURN();
 }
 
 static void
@@ -1917,6 +1941,12 @@ define_widget_list_methods(
   mrbc_define_method(
     virtual_machine,
     widget_list_class,
+    "delete",
+    c_widget_list_delete
+  );
+  mrbc_define_method(
+    virtual_machine,
+    widget_list_class,
     "area",
     c_widget_list_area
   );
@@ -2012,6 +2042,12 @@ define_widget_text_view_methods(
     widget_text_view_class,
     "new",
     c_widget_text_view_new
+  );
+  mrbc_define_method(
+    virtual_machine,
+    widget_text_view_class,
+    "delete",
+    c_widget_text_view_delete
   );
   mrbc_define_method(
     virtual_machine,

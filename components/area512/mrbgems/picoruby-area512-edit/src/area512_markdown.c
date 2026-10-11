@@ -12,6 +12,7 @@
 #include "io-console.h"
 #include <mrubyc.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
   MarkdownViewer *viewer;
@@ -23,24 +24,20 @@ get_session(mrbc_value *values) {
   return *(markdown_session **)values->instance->data;
 }
 
-static void
-c_markdown_new(
-  mrbc_vm *virtual_machine,
-  mrbc_value *values,
-  int argument_count
+static markdown_session *
+open_markdown_session(
+  const char *path,
+  int path_byte_length,
+  const char **exception_message
 ) {
 
   markdown_session *session =
     (markdown_session *)malloc(sizeof(markdown_session));
 
   if (!session) {
-    mrbc_raise(
-      virtual_machine,
-      MRBC_CLASS(RuntimeError),
-      "failed to allocate Markdown"
-    );
+    *exception_message = "failed to allocate Markdown";
 
-    return;
+    return NULL;
   }
 
   session->viewer = NULL;
@@ -52,13 +49,9 @@ c_markdown_new(
   if (!viewer) {
     free(session);
 
-    mrbc_raise(
-      virtual_machine,
-      MRBC_CLASS(RuntimeError),
-      "failed to allocate Markdown"
-    );
+    *exception_message = "failed to allocate Markdown";
 
-    return;
+    return NULL;
   }
 
   session->viewer = viewer;
@@ -74,12 +67,7 @@ c_markdown_new(
 
   init_markdown_viewer(viewer, columns, rows);
 
-  if (argument_count >= 1 && mrbc_type(values[1]) == MRBC_TT_STRING &&
-      values[1].string->size > 0) {
-
-    const char *path = (const char *)values[1].string->data;
-    int path_byte_length = values[1].string->size;
-
+  if (path && path_byte_length > 0) {
     set_markdown_viewer_filepath(viewer, path, path_byte_length);
 
     VimString content;
@@ -91,34 +79,11 @@ c_markdown_new(
     vim_string_free(&content);
   }
 
-  mrbc_value instance =
-    mrbc_instance_new(virtual_machine, values->cls, sizeof(markdown_session *));
-
-  *(markdown_session **)instance.instance->data = session;
-
-  mrbc_decref(values);
-
-  values[0] = instance;
+  return session;
 }
 
 static void
-c_markdown_show(
-  mrbc_vm *virtual_machine,
-  mrbc_value *values,
-  int argument_count
-) {
-
-  (void)virtual_machine;
-  (void)argument_count;
-
-  markdown_session *session = get_session(values);
-
-  if (!session || !session->viewer) {
-    mrbc_decref(values);
-    mrbc_set_nil(values);
-    return;
-  }
-
+run_markdown_session(markdown_session *session) {
   MarkdownViewer *viewer = session->viewer;
 
   session->canvas.char_width = EDIT_CHAR_WIDTH;
@@ -176,18 +141,10 @@ c_markdown_show(
   }
 
   io_cooked_bang();
-
-  mrbc_decref(values);
-  mrbc_set_nil(values);
 }
 
 static void
-mrbc_markdown_free(mrbc_value *self) {
-  markdown_session *session = *(markdown_session **)self->instance->data;
-
-  if (!session)
-    return;
-
+close_markdown_session(markdown_session *session) {
   if (session->canvas.row_sprite)
     area512_sprite_delete(session->canvas.row_sprite);
 
@@ -199,7 +156,83 @@ mrbc_markdown_free(mrbc_value *self) {
   free(session);
 }
 
-#ifdef AREA512_EXT_DISPLAY
+int
+area512_view_markdown_file(const char *path, const char **exception_message) {
+  markdown_session *session =
+    open_markdown_session(path, (int)strlen(path), exception_message);
+
+  if (!session)
+    return -1;
+
+  run_markdown_session(session);
+  close_markdown_session(session);
+
+  return 0;
+}
+
+static void
+c_markdown_new(
+  mrbc_vm *virtual_machine,
+  mrbc_value *values,
+  int argument_count
+) {
+
+  const char *path = NULL;
+  int path_byte_length = 0;
+  const char *exception_message = NULL;
+
+  if (argument_count >= 1 && mrbc_type(values[1]) == MRBC_TT_STRING) {
+    path = (const char *)values[1].string->data;
+    path_byte_length = values[1].string->size;
+  }
+
+  markdown_session *session =
+    open_markdown_session(path, path_byte_length, &exception_message);
+
+  if (!session) {
+    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), exception_message);
+
+    return;
+  }
+
+  mrbc_value instance =
+    mrbc_instance_new(virtual_machine, values->cls, sizeof(markdown_session *));
+
+  *(markdown_session **)instance.instance->data = session;
+
+  mrbc_decref(values);
+
+  values[0] = instance;
+}
+
+static void
+c_markdown_show(
+  mrbc_vm *virtual_machine,
+  mrbc_value *values,
+  int argument_count
+) {
+
+  (void)virtual_machine;
+  (void)argument_count;
+
+  markdown_session *session = get_session(values);
+
+  if (session && session->viewer)
+    run_markdown_session(session);
+
+  mrbc_decref(values);
+  mrbc_set_nil(values);
+}
+
+static void
+mrbc_markdown_free(mrbc_value *self) {
+  markdown_session *session = *(markdown_session **)self->instance->data;
+
+  if (session)
+    close_markdown_session(session);
+}
+
+#ifdef AREA512_INTERNAL_DISPLAY
 static void
 c_markdown_show_internal(
   mrbc_vm *virtual_machine,
@@ -261,10 +294,10 @@ define_markdown_class(mrbc_vm *virtual_machine) {
   mrbc_define_method(virtual_machine, markdown_class, "new", c_markdown_new);
   mrbc_define_method(virtual_machine, markdown_class, "show", c_markdown_show);
 
-#ifdef AREA512_EXT_DISPLAY
+#ifdef AREA512_INTERNAL_DISPLAY
   mrbc_value enabled = mrbc_true_value();
 
-  mrbc_set_const(mrbc_str_to_symid("AREA512_EXT_DISPLAY"), &enabled);
+  mrbc_set_const(mrbc_str_to_symid("AREA512_INTERNAL_DISPLAY"), &enabled);
 
   mrbc_define_method(
     virtual_machine,
