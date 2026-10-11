@@ -21,7 +21,7 @@ typedef struct {
   int previous_page_top_row;
 } InternalMarkdownPagination;
 
-static char internal_markdown_path_buffer[AREA512_PATH_MAX];
+static char resolved_path[AREA512_PATH_MAX];
 static int internal_markdown_page_top_row;
 static int internal_markdown_next_page_top_row;
 static int is_internal_markdown_shown;
@@ -204,7 +204,7 @@ draw_internal_markdown(
   *is_end_of_file_read = 0;
   *next_page_top_row = internal_markdown_page_top_row;
 
-  FILE *file = fopen(internal_markdown_path_buffer, "rb");
+  FILE *file = fopen(resolved_path, "rb");
   char *line = file ? (char *)malloc(MARKDOWN_LINE_BYTE_SIZE) : NULL;
 
   if (!line) {
@@ -290,7 +290,7 @@ draw_internal_markdown(
 
 static int
 measure_previous_internal_markdown_page_top_row(void) {
-  FILE *file = fopen(internal_markdown_path_buffer, "rb");
+  FILE *file = fopen(resolved_path, "rb");
   char *line = file ? (char *)malloc(MARKDOWN_LINE_BYTE_SIZE) : NULL;
 
   if (!line) {
@@ -358,8 +358,8 @@ show_internal_markdown(const char *path) {
   if (
     area512_resolve_data_path(
       path,
-      internal_markdown_path_buffer,
-      sizeof(internal_markdown_path_buffer)
+      resolved_path,
+      sizeof(resolved_path)
     ) != 0
   ) {
 

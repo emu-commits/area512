@@ -9,11 +9,15 @@ extern "C" {
 #endif
 
 // Ruby-visible paths are rooted here: "/" in Ruby means this directory.
-#define AREA512_DATA_ROOT "/sdcard/Area512_data"
+#define AREA512_ROOT_PATH "/sdcard/Area512_data"
 #define AREA512_PATH_MAX 256
 
 int
-area512_resolve_data_path(const char *path, char *buffer, size_t buffer_size);
+area512_resolve_data_path(
+  const char *path,
+  char *resolved_path,
+  size_t resolved_path_size
+);
 
 void area512_console_poll(void);
 int area512_console_getchar(void);
@@ -123,9 +127,9 @@ int area512_seed_restore(void);
 int area512_seed_update(void);
 const uint8_t *area512_seed_find_file(const char *path, size_t *size);
 bool area512_ensure_directory(const char *path);
-bool area512_ensure_parent_directories(char *full_path);
+bool area512_ensure_parent_directories(char *resolved_path);
 
-char *area512_split_next_manifest_entry(char **manifest_cursor);
+char *area512_read_next_manifest_entry(char **manifest_cursor);
 void area512_join_manifest_entry_path(
   const char *directory_path,
   const char *entry_name,

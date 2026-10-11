@@ -9,7 +9,7 @@
 #include "area512_micropython.h"
 #include "area512_ruby_vm.h"
 #include "area512_sandbox.h"
-#include "area512_shared_stack.h"
+#include "area512_task_replacement.h"
 #include "python_repl.h"
 
 #include <dirent.h>
@@ -63,15 +63,21 @@ static void run_filer_task(void *task_parameter);
 static void
 join_path(
   const char *directory_path,
-  const char *name,
+  const char *entry_name,
   char *joined_path,
   int joined_path_size
 ) {
 
   if (strcmp(directory_path, "/") == 0)
-    snprintf(joined_path, joined_path_size, "/%s", name);
+    snprintf(joined_path, joined_path_size, "/%s", entry_name);
   else
-    snprintf(joined_path, joined_path_size, "%s/%s", directory_path, name);
+    snprintf(
+      joined_path,
+      joined_path_size,
+      "%s/%s",
+      directory_path,
+      entry_name
+    );
 }
 
 static int
@@ -112,34 +118,52 @@ dir_name(const char *path, char *directory_path, int directory_path_size) {
 }
 
 static void
-strip_extension(const char *name, char *stripped_name, int stripped_name_size) {
-  int kept_byte_count = (int)strlen(name);
+strip_extension(
+  const char *file_name,
+  char *stripped_name,
+  int stripped_name_size
+) {
 
-  if (has_path_suffix(name, ".mrb") || has_path_suffix(name, ".mpy"))
+  int kept_byte_count = (int)strlen(file_name);
+
+  if (
+    has_path_suffix(file_name, ".mrb") ||
+    has_path_suffix(file_name, ".mpy")
+  )
     kept_byte_count -= 4;
-  else if (has_path_suffix(name, ".rb") || has_path_suffix(name, ".py"))
+
+  else if (
+    has_path_suffix(file_name, ".rb") ||
+    has_path_suffix(file_name, ".py")
+  )
     kept_byte_count -= 3;
 
-  snprintf(stripped_name, stripped_name_size, "%.*s", kept_byte_count, name);
+  snprintf(
+    stripped_name,
+    stripped_name_size,
+    "%.*s",
+    kept_byte_count,
+    file_name
+  );
 }
 
 static void
 build_bytecode_name(
-  const char *name,
+  const char *source_file_name,
   const char *source_suffix,
   const char *bytecode_suffix,
   char *bytecode_name,
   int bytecode_name_size
 ) {
 
-  if (!has_path_suffix(name, source_suffix)) {
-    snprintf(bytecode_name, bytecode_name_size, "%s", name);
+  if (!has_path_suffix(source_file_name, source_suffix)) {
+    snprintf(bytecode_name, bytecode_name_size, "%s", source_file_name);
     return;
   }
 
   char stripped_name[CURRENT_DIRECTORY_MAX];
 
-  strip_extension(name, stripped_name, sizeof stripped_name);
+  strip_extension(source_file_name, stripped_name, sizeof stripped_name);
 
   snprintf(
     bytecode_name,
@@ -151,18 +175,18 @@ build_bytecode_name(
 }
 
 static int
-path_exists(const char *path) {
+path_exists(const char *resolved_path) {
   struct stat stat_buffer;
 
-  return stat_data_path(path, &stat_buffer) == 0;
+  return stat(resolved_path, &stat_buffer) == 0;
 }
 
 static int
-path_is_directory(const char *path) {
+path_is_directory(const char *resolved_path) {
   struct stat stat_buffer;
 
-  return stat_data_path(path, &stat_buffer) == 0 &&
-    S_ISDIR(stat_buffer.st_mode);
+  return stat(resolved_path, &stat_buffer) == 0 &&
+         S_ISDIR(stat_buffer.st_mode);
 }
 
 static void
@@ -183,8 +207,20 @@ resolve_data_path_or_format_error(
   int message_size
 ) {
 
-  if (area512_resolve_data_path(path, resolved_path, AREA512_PATH_MAX) != 0) {
-    format_runtime_error_message(message, message_size, "invalid path");
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      AREA512_PATH_MAX
+    ) != 0
+  ) {
+
+    format_runtime_error_message(
+      message,
+      message_size,
+      "invalid path"
+    );
+
     return -1;
   }
 
@@ -196,25 +232,24 @@ resolve_data_path_or_format_error(
 // -----------------------------------------------------------------------------
 
 static char *
-read_entry_names(const char *directory_path, int *entry_name_count) {
-  char resolved_path[AREA512_PATH_MAX];
+read_entry_names(
+  const char *directory_resolved_path,
+  int *entry_name_count,
+  char *message,
+  int message_size
+) {
 
-  if (
-    area512_resolve_data_path(
-      directory_path,
-      resolved_path,
-      sizeof resolved_path
-    ) != 0
-  ) {
+  DIR *directory = opendir(directory_resolved_path);
 
-    errno = EINVAL;
+  if (!directory) {
+    format_runtime_error_message(
+      message,
+      message_size,
+      strerror(errno)
+    );
+
     return NULL;
   }
-
-  DIR *directory = opendir(resolved_path);
-
-  if (!directory)
-    return NULL;
 
   size_t entry_names_byte_count = 0;
   size_t entry_names_byte_capacity = ENTRY_NAMES_INITIAL_BYTE_CAPACITY;
@@ -222,7 +257,12 @@ read_entry_names(const char *directory_path, int *entry_name_count) {
 
   if (!entry_names) {
     closedir(directory);
-    errno = ENOMEM;
+
+    format_runtime_error_message(
+      message,
+      message_size,
+      "out of memory"
+    );
 
     return NULL;
   }
@@ -257,7 +297,12 @@ read_entry_names(const char *directory_path, int *entry_name_count) {
       if (!grown_entry_names) {
         free(entry_names);
         closedir(directory);
-        errno = ENOMEM;
+
+        format_runtime_error_message(
+          message,
+          message_size,
+          "out of memory"
+        );
 
         return NULL;
       }
@@ -272,6 +317,7 @@ read_entry_names(const char *directory_path, int *entry_name_count) {
     );
 
     entry_names_byte_count += entry_name_byte_length + 1;
+
     (*entry_name_count)++;
   }
 
@@ -289,12 +335,36 @@ build_entries(Filer *filer) {
   if (strcmp(filer->current_directory, "/") != 0) {
     snprintf(entry.name, sizeof entry.name, "..");
     entry.type = ENTRY_TYPE_UP;
-    add_entry_in_order(filer->entries, &filer->count, MAX_ENTRIES, &entry);
+
+    add_entry_in_order(
+      filer->entries,
+      &filer->count,
+      MAX_ENTRIES,
+      &entry
+    );
   }
 
+  char resolved_path[AREA512_PATH_MAX];
+
+  if (
+    resolve_data_path_or_format_error(
+      filer->current_directory,
+      resolved_path,
+      filer->message,
+      MESSAGE_MAX
+    ) != 0
+  )
+    return;
+
   int entry_name_count = 0;
+
   char *entry_names =
-    read_entry_names(filer->current_directory, &entry_name_count);
+    read_entry_names(
+      resolved_path,
+      &entry_name_count,
+      filer->message,
+      MESSAGE_MAX
+    );
 
   if (!entry_names)
     return;
@@ -303,6 +373,7 @@ build_entries(Filer *filer) {
 
   for (int i = 0; i < entry_name_count; i++) {
     char entry_path[CURRENT_DIRECTORY_MAX];
+    char entry_resolved_path[AREA512_PATH_MAX];
 
     join_path(
       filer->current_directory,
@@ -313,10 +384,25 @@ build_entries(Filer *filer) {
 
     snprintf(entry.name, sizeof entry.name, "%s", entry_name);
 
-    entry.type =
-      path_is_directory(entry_path) ? ENTRY_TYPE_DIR : ENTRY_TYPE_FILE;
+    entry.type = ENTRY_TYPE_FILE;
 
-    add_entry_in_order(filer->entries, &filer->count, MAX_ENTRIES, &entry);
+    if (
+      resolve_data_path_or_format_error(
+        entry_path,
+        entry_resolved_path,
+        filer->message,
+        MESSAGE_MAX
+      ) == 0 &&
+      path_is_directory(entry_resolved_path)
+    )
+      entry.type = ENTRY_TYPE_DIR;
+
+    add_entry_in_order(
+      filer->entries,
+      &filer->count,
+      MAX_ENTRIES,
+      &entry
+    );
 
     entry_name += strlen(entry_name) + 1;
   }
@@ -376,26 +462,22 @@ static void
 show_app_image(const char *app_directory_path) {
   char image_path[CURRENT_DIRECTORY_MAX];
 
-  join_path(app_directory_path, APP_IMAGE_NAME, image_path, sizeof image_path);
+  join_path(
+    app_directory_path,
+    APP_IMAGE_NAME,
+    image_path,
+    sizeof image_path
+  );
 
-  if (path_exists(image_path))
-    area512_gfx_show_header_image(image_path, APP_IMAGE_HOLD_MILLISECONDS);
+  area512_gfx_show_header_image(
+    image_path,
+    APP_IMAGE_HOLD_MILLISECONDS
+  );
 }
 
 static int
-is_python_manifest(const char *manifest_path) {
-  char resolved_path[AREA512_PATH_MAX];
-
-  if (
-    area512_resolve_data_path(
-      manifest_path,
-      resolved_path,
-      sizeof resolved_path
-    ) != 0
-  )
-    return 0;
-
-  FILE *manifest_file = fopen(resolved_path, "r");
+is_python_manifest(const char *manifest_resolved_path) {
+  FILE *manifest_file = fopen(manifest_resolved_path, "r");
 
   if (!manifest_file)
     return 0;
@@ -405,8 +487,9 @@ is_python_manifest(const char *manifest_path) {
 
   while (fgets(manifest_line, sizeof manifest_line, manifest_file)) {
     char *manifest_cursor = manifest_line;
+
     char *first_entry_name =
-      area512_split_next_manifest_entry(&manifest_cursor);
+      area512_read_next_manifest_entry(&manifest_cursor);
 
     if (first_entry_name) {
       is_python = has_path_suffix(first_entry_name, ".mpy");
@@ -433,7 +516,7 @@ record_arena_used_byte_size_of_gc_heap(void) {
 static int
 compile_source(
   const char *directory_path,
-  const char *name,
+  const char *source_file_name,
   char *error_message,
   int error_message_size
 ) {
@@ -442,11 +525,16 @@ compile_source(
   char bytecode_name[CURRENT_DIRECTORY_MAX];
   char bytecode_path[CURRENT_DIRECTORY_MAX];
 
-  join_path(directory_path, name, source_path, sizeof source_path);
+  join_path(
+    directory_path,
+    source_file_name,
+    source_path,
+    sizeof source_path
+  );
 
-  if (has_path_suffix(name, ".py")) {
+  if (has_path_suffix(source_file_name, ".py")) {
     build_bytecode_name(
-      name,
+      source_file_name,
       ".py",
       ".mpy",
       bytecode_name,
@@ -488,7 +576,7 @@ compile_source(
   }
 
   build_bytecode_name(
-    name,
+    source_file_name,
     ".rb",
     ".mrb",
     bytecode_name,
@@ -504,6 +592,7 @@ compile_source(
 
   const char *exception_message = NULL;
 
+  area512_init_arena();
   area512_open_ruby_vm();
 
   int compile_result =
@@ -520,7 +609,7 @@ compile_source(
       exception_message
     );
 
-  area512_close_ruby_vm();
+  area512_detach_arena();
 
   return compile_result;
 }
@@ -528,26 +617,50 @@ compile_source(
 static void
 compile_entry(
   const char *directory_path,
-  const char *name,
+  const char *source_file_name,
   char *message,
   int message_size
 ) {
 
-  if (compile_source(directory_path, name, message, message_size) != 0)
+  if (
+    compile_source(
+      directory_path,
+      source_file_name,
+      message,
+      message_size
+    ) != 0
+  )
     return;
 
-  snprintf(message, message_size, "Compiled %s", name);
+  snprintf(message, message_size, "Compiled %s", source_file_name);
 }
 
 static void
 compile_all(const char *directory_path, char *message, int message_size) {
-  int entry_name_count = 0;
-  char *entry_names = read_entry_names(directory_path, &entry_name_count);
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (!entry_names) {
-    format_runtime_error_message(message, message_size, strerror(errno));
+  if (
+    resolve_data_path_or_format_error(
+      directory_path,
+      resolved_path,
+      message,
+      message_size
+    ) != 0
+  )
     return;
-  }
+
+  int entry_name_count = 0;
+
+  char *entry_names =
+    read_entry_names(
+      resolved_path,
+      &entry_name_count,
+      message,
+      message_size
+    );
+
+  if (!entry_names)
+    return;
 
   const char *entry_name = entry_names;
   int compiled_count = 0;
@@ -594,6 +707,7 @@ compile_all(const char *directory_path, char *message, int message_size) {
 static SandboxState *
 start_ruby_app(const char *label) {
   area512_console_reset();
+  area512_init_arena();
   area512_open_ruby_vm();
   area512_run_environment_task();
 
@@ -631,7 +745,7 @@ finish_ruby_app(
     break;
   }
 
-  area512_close_ruby_vm();
+  area512_detach_arena();
   area512_console_wait_key_if_output();
 }
 
@@ -644,8 +758,10 @@ run_mrb(
 ) {
 
   SandboxState *sandbox_state = start_ruby_app(label);
+
   char exception_message_buffer[MESSAGE_MAX] =
     "failed to compile suspend_vm_code";
+
   const char *exception_class_name = "RuntimeError";
   int run_result = AREA512_SANDBOX_RUN_LOAD_FAILED;
 
@@ -659,11 +775,14 @@ run_mrb(
         &exception_class_name
       );
 
+  if (run_result == AREA512_SANDBOX_RUN_RAISED)
+    exception_class_name = NULL;
+
   finish_ruby_app(
     label,
     run_result,
     exception_message_buffer,
-    run_result == AREA512_SANDBOX_RUN_RAISED ? NULL : exception_class_name,
+    exception_class_name,
     message,
     message_size
   );
@@ -679,8 +798,10 @@ run_manifest(
 ) {
 
   SandboxState *sandbox_state = start_ruby_app(label);
+
   char exception_message_buffer[MESSAGE_MAX] =
     "failed to compile suspend_vm_code";
+
   const char *exception_class_name = "RuntimeError";
   int run_result = AREA512_SANDBOX_RUN_LOAD_FAILED;
 
@@ -764,14 +885,19 @@ run_python_manifest(
 static void
 run_ruby(
   const char *directory_path,
-  const char *name,
+  const char *ruby_file_name,
   char *message,
   int message_size
 ) {
 
   if (
-    has_path_suffix(name, ".rb") &&
-    compile_source(directory_path, name, message, message_size) != 0
+    has_path_suffix(ruby_file_name, ".rb") &&
+    compile_source(
+      directory_path,
+      ruby_file_name,
+      message,
+      message_size
+    ) != 0
   )
     return;
 
@@ -780,29 +906,45 @@ run_ruby(
   char label[CURRENT_DIRECTORY_MAX];
 
   build_bytecode_name(
-    name,
+    ruby_file_name,
     ".rb",
     ".mrb",
     bytecode_name,
     sizeof bytecode_name
   );
 
-  join_path(directory_path, bytecode_name, mrb_path, sizeof mrb_path);
-  strip_extension(base_name(mrb_path), label, sizeof label);
+  join_path(
+    directory_path,
+    bytecode_name,
+    mrb_path,
+    sizeof mrb_path
+  );
+
+  strip_extension(
+    base_name(mrb_path),
+    label,
+    sizeof label
+  );
+
   run_mrb(mrb_path, label, message, message_size);
 }
 
 static void
 run_python(
   const char *directory_path,
-  const char *name,
+  const char *python_file_name,
   char *message,
   int message_size
 ) {
 
   if (
-    has_path_suffix(name, ".py") &&
-    compile_source(directory_path, name, message, message_size) != 0
+    has_path_suffix(python_file_name, ".py") &&
+    compile_source(
+      directory_path,
+      python_file_name,
+      message,
+      message_size
+    ) != 0
   )
     return;
 
@@ -811,22 +953,33 @@ run_python(
   char label[CURRENT_DIRECTORY_MAX];
 
   build_bytecode_name(
-    name,
+    python_file_name,
     ".py",
     ".mpy",
     bytecode_name,
     sizeof bytecode_name
   );
 
-  join_path(directory_path, bytecode_name, mpy_path, sizeof mpy_path);
-  strip_extension(base_name(mpy_path), label, sizeof label);
+  join_path(
+    directory_path,
+    bytecode_name,
+    mpy_path,
+    sizeof mpy_path
+  );
+
+  strip_extension(
+    base_name(mpy_path),
+    label,
+    sizeof label
+  );
+
   run_mpy(mpy_path, label, message, message_size);
 }
 
 static void
 run_dir(
   const char *directory_path,
-  const char *name,
+  const char *app_directory_name,
   char *message,
   int message_size
 ) {
@@ -838,7 +991,7 @@ run_dir(
 
   join_path(
     directory_path,
-    name,
+    app_directory_name,
     app_directory_path,
     sizeof app_directory_path
   );
@@ -864,15 +1017,41 @@ run_dir(
     sizeof python_main_path
   );
 
-  if (path_exists(manifest_path)) {
+  char manifest_resolved_path[AREA512_PATH_MAX];
+  char ruby_main_resolved_path[AREA512_PATH_MAX];
+  char python_main_resolved_path[AREA512_PATH_MAX];
+
+  if (
+    resolve_data_path_or_format_error(
+      manifest_path,
+      manifest_resolved_path,
+      message,
+      message_size
+    ) != 0 ||
+    resolve_data_path_or_format_error(
+      ruby_main_path,
+      ruby_main_resolved_path,
+      message,
+      message_size
+    ) != 0 ||
+    resolve_data_path_or_format_error(
+      python_main_path,
+      python_main_resolved_path,
+      message,
+      message_size
+    ) != 0
+  )
+    return;
+
+  if (path_exists(manifest_resolved_path)) {
     show_app_readme(app_directory_path);
     show_app_image(app_directory_path);
 
-    if (is_python_manifest(manifest_path))
+    if (is_python_manifest(manifest_resolved_path))
       run_python_manifest(
         app_directory_path,
         manifest_path,
-        name,
+        app_directory_name,
         message,
         message_size
       );
@@ -880,23 +1059,36 @@ run_dir(
       run_manifest(
         app_directory_path,
         manifest_path,
-        name,
+        app_directory_name,
         message,
         message_size
       );
 
     hide_readme();
 
-  } else if (path_exists(ruby_main_path)) {
+  } else if (path_exists(ruby_main_resolved_path)) {
     show_app_readme(app_directory_path);
     show_app_image(app_directory_path);
-    run_mrb(ruby_main_path, name, message, message_size);
+
+    run_mrb(
+      ruby_main_path,
+      app_directory_name,
+      message, message_size
+    );
+
     hide_readme();
 
-  } else if (path_exists(python_main_path)) {
+  } else if (path_exists(python_main_resolved_path)) {
     show_app_readme(app_directory_path);
     show_app_image(app_directory_path);
-    run_mpy(python_main_path, name, message, message_size);
+
+    run_mpy(
+      python_main_path,
+      app_directory_name,
+      message,
+      message_size
+    );
+
     hide_readme();
 
   } else {
@@ -904,22 +1096,26 @@ run_dir(
       message,
       message_size,
       "No main.manifest, main.mrb or main.mpy in %s",
-      name
+      app_directory_name
     );
   }
 }
 
 static void
 run_irb(void) {
+  area512_init_arena();
   area512_open_ruby_vm();
   area512_run_environment_task();
   area512_run_irb_task();
-  area512_close_ruby_vm();
+  area512_detach_arena();
 }
 
 static void
 run_python_repl(void) {
-  area512_run_python_repl(g_area512_arena, AREA512_ARENA_BYTE_SIZE);
+  area512_run_python_repl(
+    g_area512_arena,
+    AREA512_ARENA_BYTE_SIZE
+  );
 
   record_arena_used_byte_size_of_gc_heap();
 }
@@ -933,14 +1129,15 @@ edit_entry(const char *path, char *message, int message_size) {
   const char *exception_message = NULL;
 
   show_etc_readme("vim");
-  area512_open_ruby_vm();
+  area512_init_arena();
 
   if (area512_edit_file(path, &exception_message) != 0)
     format_runtime_error_message(message, message_size, exception_message);
   else
     snprintf(message, message_size, "Returned from vim");
 
-  area512_close_ruby_vm();
+  area512_detach_arena();
+
   hide_readme();
 }
 
@@ -949,14 +1146,14 @@ view_markdown(const char *path, char *message, int message_size) {
   const char *exception_message = NULL;
 
   show_etc_readme("markdown");
-  area512_open_ruby_vm();
 
-  if (area512_view_markdown_file(path, &exception_message) != 0)
+  if (
+    area512_view_markdown_file(path, &exception_message) != 0
+  )
     format_runtime_error_message(message, message_size, exception_message);
   else
     snprintf(message, message_size, "Returned from viewer");
 
-  area512_close_ruby_vm();
   hide_readme();
 }
 
@@ -966,7 +1163,12 @@ edit_dot(const char *path, char *message, int message_size) {
 
   show_etc_readme("dot");
 
-  if (area512_edit_dot_image_file(path, &exception_message) != 0)
+  if (
+    area512_edit_dot_image_file(
+      path,
+      &exception_message
+    ) != 0
+  )
     format_runtime_error_message(message, message_size, exception_message);
   else
     snprintf(message, message_size, "Returned from dot");
@@ -1000,7 +1202,12 @@ run_action_task(void *task_parameter) {
     break;
 
   case ACTION_RUN_RUBY:
-    run_ruby(target_directory_path, target_name, filer->message, MESSAGE_MAX);
+    run_ruby(
+      target_directory_path,
+      target_name,
+      filer->message,
+      MESSAGE_MAX
+    );
     break;
 
   case ACTION_COMPILE:
@@ -1014,11 +1221,22 @@ run_action_task(void *task_parameter) {
     break;
 
   case ACTION_COMPILE_ALL:
-    compile_all(s_action_task_request.target_path, filer->message, MESSAGE_MAX);
+    compile_all(
+      s_action_task_request.target_path,
+      filer->message,
+      MESSAGE_MAX
+    );
+
     break;
 
   case ACTION_RUN_DIR:
-    run_dir(target_directory_path, target_name, filer->message, MESSAGE_MAX);
+    run_dir(
+      target_directory_path,
+      target_name,
+      filer->message,
+      MESSAGE_MAX
+    );
+
     break;
 
   case ACTION_RUN_PYTHON:
@@ -1032,7 +1250,12 @@ run_action_task(void *task_parameter) {
     break;
 
   case ACTION_EDIT:
-    edit_entry(s_action_task_request.target_path, filer->message, MESSAGE_MAX);
+    edit_entry(
+      s_action_task_request.target_path,
+      filer->message,
+      MESSAGE_MAX
+    );
+
     break;
 
   case ACTION_VIEW_MARKDOWN:
@@ -1045,7 +1268,11 @@ run_action_task(void *task_parameter) {
     break;
   }
 
-  area512_switch_shared_stack_task(FILER_TASK_NAME, run_filer_task, filer);
+  area512_replace_current_task(
+    FILER_TASK_NAME,
+    run_filer_task,
+    filer
+  );
 }
 
 // -----------------------------------------------------------------------------
@@ -1055,12 +1282,12 @@ run_action_task(void *task_parameter) {
 static void
 create_file(
   const char *current_directory,
-  const char *name,
+  const char *file_name,
   char *message,
   int message_size
 ) {
 
-  if (name[0] == '\0') {
+  if (file_name[0] == '\0') {
     snprintf(message, message_size, "Empty name");
     return;
   }
@@ -1068,12 +1295,12 @@ create_file(
   char entry_path[CURRENT_DIRECTORY_MAX];
   char resolved_path[AREA512_PATH_MAX];
 
-  join_path(current_directory, name, entry_path, sizeof entry_path);
-
-  if (path_exists(entry_path)) {
-    snprintf(message, message_size, "Already exists");
-    return;
-  }
+  join_path(
+    current_directory,
+    file_name,
+    entry_path,
+    sizeof entry_path
+  );
 
   if (
     resolve_data_path_or_format_error(
@@ -1085,27 +1312,37 @@ create_file(
   )
     return;
 
+  if (path_exists(resolved_path)) {
+    snprintf(message, message_size, "Already exists");
+    return;
+  }
+
   FILE *created_file = fopen(resolved_path, "w");
 
   if (!created_file) {
-    format_runtime_error_message(message, message_size, strerror(errno));
+    format_runtime_error_message(
+      message,
+      message_size,
+      strerror(errno)
+    );
+
     return;
   }
 
   fclose(created_file);
 
-  snprintf(message, message_size, "Created %s", name);
+  snprintf(message, message_size, "Created %s", file_name);
 }
 
 static void
 create_dir(
   const char *current_directory,
-  const char *name,
+  const char *directory_name,
   char *message,
   int message_size
 ) {
 
-  if (name[0] == '\0') {
+  if (directory_name[0] == '\0') {
     snprintf(message, message_size, "Empty name");
     return;
   }
@@ -1113,12 +1350,12 @@ create_dir(
   char entry_path[CURRENT_DIRECTORY_MAX];
   char resolved_path[AREA512_PATH_MAX];
 
-  join_path(current_directory, name, entry_path, sizeof entry_path);
-
-  if (path_exists(entry_path)) {
-    snprintf(message, message_size, "Already exists");
-    return;
-  }
+  join_path(
+    current_directory,
+    directory_name,
+    entry_path,
+    sizeof entry_path
+  );
 
   if (
     resolve_data_path_or_format_error(
@@ -1130,31 +1367,41 @@ create_dir(
   )
     return;
 
-  if (mkdir(resolved_path, 0777) != 0) {
-    format_runtime_error_message(message, message_size, strerror(errno));
+  if (path_exists(resolved_path)) {
+    snprintf(message, message_size, "Already exists");
+
     return;
   }
 
-  snprintf(message, message_size, "Created %s/", name);
+  if (mkdir(resolved_path, 0777) != 0) {
+    format_runtime_error_message(
+      message,
+      message_size,
+      strerror(errno)
+    );
+
+    return;
+  }
+
+  snprintf(message, message_size, "Created %s/", directory_name);
 }
 
 static int
-remove_tree(const char *path, char *message, int message_size) {
-  char resolved_path[AREA512_PATH_MAX];
+delete_tree(
+  const char *path,
+  const char *resolved_path,
+  char *message,
+  int message_size
+) {
 
-  if (!path_is_directory(path)) {
-    if (
-      resolve_data_path_or_format_error(
-        path,
-        resolved_path,
-        message,
-        message_size
-      ) != 0
-    )
-      return -1;
-
+  if (!path_is_directory(resolved_path)) {
     if (unlink(resolved_path) != 0) {
-      format_runtime_error_message(message, message_size, strerror(errno));
+      format_runtime_error_message(
+        message,
+        message_size,
+        strerror(errno)
+      );
+
       return -1;
     }
 
@@ -1162,21 +1409,44 @@ remove_tree(const char *path, char *message, int message_size) {
   }
 
   int entry_name_count = 0;
-  char *entry_names = read_entry_names(path, &entry_name_count);
+  char *entry_names =
+    read_entry_names(
+      resolved_path,
+      &entry_name_count,
+      message, message_size
+    );
 
-  if (!entry_names) {
-    format_runtime_error_message(message, message_size, strerror(errno));
+  if (!entry_names)
     return -1;
-  }
 
   const char *entry_name = entry_names;
 
   for (int i = 0; i < entry_name_count; i++) {
     char entry_path[CURRENT_DIRECTORY_MAX];
+    char entry_resolved_path[AREA512_PATH_MAX];
 
-    join_path(path, entry_name, entry_path, sizeof entry_path);
+    join_path(
+      path,
+      entry_name,
+      entry_path,
+      sizeof entry_path
+    );
 
-    if (remove_tree(entry_path, message, message_size) != 0) {
+    if (
+      resolve_data_path_or_format_error(
+        entry_path,
+        entry_resolved_path,
+        message,
+        message_size
+      ) != 0 ||
+      delete_tree(
+        entry_path,
+        entry_resolved_path,
+        message,
+        message_size
+      ) != 0
+    ) {
+
       free(entry_names);
       return -1;
     }
@@ -1186,18 +1456,13 @@ remove_tree(const char *path, char *message, int message_size) {
 
   free(entry_names);
 
-  if (
-    resolve_data_path_or_format_error(
-      path,
-      resolved_path,
-      message,
-      message_size
-    ) != 0
-  )
-    return -1;
-
   if (rmdir(resolved_path) != 0) {
-    format_runtime_error_message(message, message_size, strerror(errno));
+    format_runtime_error_message(
+      message,
+      message_size,
+      strerror(errno)
+    );
+
     return -1;
   }
 
@@ -1206,7 +1471,19 @@ remove_tree(const char *path, char *message, int message_size) {
 
 static void
 delete_entry(const char *path, char *message, int message_size) {
-  if (remove_tree(path, message, message_size) != 0)
+  char resolved_path[AREA512_PATH_MAX];
+
+  if (
+    resolve_data_path_or_format_error(
+      path,
+      resolved_path,
+      message,
+      message_size
+    ) != 0
+  )
+    return;
+
+  if (delete_tree(path, resolved_path, message, message_size) != 0)
     return;
 
   snprintf(message, message_size, "Deleted %s", base_name(path));
@@ -1221,6 +1498,7 @@ resolve_destination_path(
   const char *operation_verb,
   char *destination_path,
   int destination_path_size,
+  char *destination_resolved_path,
   char *message,
   int message_size
 ) {
@@ -1263,6 +1541,7 @@ resolve_destination_path(
     );
 
   char destination_directory_path[CURRENT_DIRECTORY_MAX];
+  char destination_directory_resolved_path[AREA512_PATH_MAX];
 
   dir_name(
     destination_path,
@@ -1270,7 +1549,17 @@ resolve_destination_path(
     sizeof destination_directory_path
   );
 
-  if (!path_is_directory(destination_directory_path)) {
+  if (
+    resolve_data_path_or_format_error(
+      destination_directory_path,
+      destination_directory_resolved_path,
+      message,
+      message_size
+    ) != 0
+  )
+    return -1;
+
+  if (!path_is_directory(destination_directory_resolved_path)) {
     snprintf(message, message_size, "No such directory");
     return -1;
   }
@@ -1290,7 +1579,17 @@ resolve_destination_path(
     return -1;
   }
 
-  if (path_exists(destination_path)) {
+  if (
+    resolve_data_path_or_format_error(
+      destination_path,
+      destination_resolved_path,
+      message,
+      message_size
+    ) != 0
+  )
+    return -1;
+
+  if (path_exists(destination_resolved_path)) {
     snprintf(
       message,
       message_size,
@@ -1313,44 +1612,51 @@ move_entry(
   int message_size
 ) {
 
+  char source_resolved_path[AREA512_PATH_MAX];
   char destination_path[CURRENT_DIRECTORY_MAX];
+  char destination_resolved_path[AREA512_PATH_MAX];
+
+  if (
+    resolve_data_path_or_format_error(
+      source_path,
+      source_resolved_path,
+      message,
+      message_size
+    ) != 0
+  )
+    return;
 
   if (
     resolve_destination_path(
       current_directory,
       source_path,
-      path_is_directory(source_path),
+      path_is_directory(
+        source_resolved_path
+      ),
       destination_input,
       "move",
       destination_path,
       sizeof destination_path,
+      destination_resolved_path,
       message,
       message_size
     ) != 0
   )
     return;
-
-  char resolved_source_path[AREA512_PATH_MAX];
-  char resolved_destination_path[AREA512_PATH_MAX];
 
   if (
-    resolve_data_path_or_format_error(
-      source_path,
-      resolved_source_path,
-      message,
-      message_size
-    ) != 0 ||
-    resolve_data_path_or_format_error(
-      destination_path,
-      resolved_destination_path,
-      message,
-      message_size
+    rename(
+      source_resolved_path,
+      destination_resolved_path
     ) != 0
-  )
-    return;
+  ) {
 
-  if (rename(resolved_source_path, resolved_destination_path) != 0) {
-    format_runtime_error_message(message, message_size, strerror(errno));
+    format_runtime_error_message(
+      message,
+      message_size,
+      strerror(errno)
+    );
+
     return;
   }
 
@@ -1365,39 +1671,20 @@ move_entry(
 
 static int
 copy_file(
-  const char *source_path,
-  const char *destination_path,
+  const char *source_resolved_path,
+  const char *destination_resolved_path,
   char *message,
   int message_size
 ) {
 
-  char resolved_source_path[AREA512_PATH_MAX];
-  char resolved_destination_path[AREA512_PATH_MAX];
-
-  if (
-    resolve_data_path_or_format_error(
-      source_path,
-      resolved_source_path,
-      message,
-      message_size
-    ) != 0 ||
-    resolve_data_path_or_format_error(
-      destination_path,
-      resolved_destination_path,
-      message,
-      message_size
-    ) != 0
-  )
-    return -1;
-
-  FILE *source_file = fopen(resolved_source_path, "rb");
+  FILE *source_file = fopen(source_resolved_path, "rb");
 
   if (!source_file) {
     format_runtime_error_message(message, message_size, strerror(errno));
     return -1;
   }
 
-  FILE *destination_file = fopen(resolved_destination_path, "wb");
+  FILE *destination_file = fopen(destination_resolved_path, "wb");
 
   if (!destination_file) {
     format_runtime_error_message(message, message_size, strerror(errno));
@@ -1445,44 +1732,51 @@ copy_file(
 static int
 copy_tree(
   const char *source_path,
+  const char *source_resolved_path,
   const char *destination_path,
+  const char *destination_resolved_path,
   char *message,
   int message_size
 ) {
 
-  if (!path_is_directory(source_path))
-    return copy_file(source_path, destination_path, message, message_size);
+  if (!path_is_directory(source_resolved_path))
+    return copy_file(
+             source_resolved_path,
+             destination_resolved_path,
+             message,
+             message_size
+           );
 
-  char resolved_path[AREA512_PATH_MAX];
-
-  if (
-    resolve_data_path_or_format_error(
-      destination_path,
-      resolved_path,
+  if (mkdir(destination_resolved_path, 0777) != 0) {
+    format_runtime_error_message(
       message,
-      message_size
-    ) != 0
-  )
-    return -1;
+      message_size,
+      strerror(errno)
+    );
 
-  if (mkdir(resolved_path, 0777) != 0) {
-    format_runtime_error_message(message, message_size, strerror(errno));
     return -1;
   }
 
   int entry_name_count = 0;
-  char *entry_names = read_entry_names(source_path, &entry_name_count);
 
-  if (!entry_names) {
-    format_runtime_error_message(message, message_size, strerror(errno));
+  char *entry_names =
+    read_entry_names(
+      source_resolved_path,
+      &entry_name_count,
+      message,
+      message_size
+    );
+
+  if (!entry_names)
     return -1;
-  }
 
   const char *entry_name = entry_names;
 
   for (int i = 0; i < entry_name_count; i++) {
     char source_entry_path[CURRENT_DIRECTORY_MAX];
+    char source_entry_resolved_path[AREA512_PATH_MAX];
     char destination_entry_path[CURRENT_DIRECTORY_MAX];
+    char destination_entry_resolved_path[AREA512_PATH_MAX];
 
     join_path(
       source_path,
@@ -1499,9 +1793,23 @@ copy_tree(
     );
 
     if (
+      resolve_data_path_or_format_error(
+        source_entry_path,
+        source_entry_resolved_path,
+        message,
+        message_size
+      ) != 0 ||
+      resolve_data_path_or_format_error(
+        destination_entry_path,
+        destination_entry_resolved_path,
+        message,
+        message_size
+      ) != 0 ||
       copy_tree(
         source_entry_path,
+        source_entry_resolved_path,
         destination_entry_path,
+        destination_entry_resolved_path,
         message,
         message_size
       ) != 0
@@ -1528,24 +1836,48 @@ copy_entry(
   int message_size
 ) {
 
+  char source_resolved_path[AREA512_PATH_MAX];
   char destination_path[CURRENT_DIRECTORY_MAX];
+  char destination_resolved_path[AREA512_PATH_MAX];
 
   if (
-    resolve_destination_path(
-      current_directory,
+    resolve_data_path_or_format_error(
       source_path,
-      path_is_directory(source_path),
-      destination_input,
-      "copy",
-      destination_path,
-      sizeof destination_path,
+      source_resolved_path,
       message,
       message_size
     ) != 0
   )
     return;
 
-  if (copy_tree(source_path, destination_path, message, message_size) != 0)
+  if (
+    resolve_destination_path(
+      current_directory,
+      source_path,
+      path_is_directory(
+        source_resolved_path
+      ),
+      destination_input,
+      "copy",
+      destination_path,
+      sizeof destination_path,
+      destination_resolved_path,
+      message,
+      message_size
+    ) != 0
+  )
+    return;
+
+  if (
+    copy_tree(
+      source_path,
+      source_resolved_path,
+      destination_path,
+      destination_resolved_path,
+      message,
+      message_size
+    ) != 0
+  )
     return;
 
   snprintf(
@@ -1604,7 +1936,13 @@ run_sd_error_screen(Filer *filer) {
 
   snprintf(entry.name, sizeof entry.name, SD_ERROR_RETRY_NAME);
   entry.type = ENTRY_TYPE_UP;
-  add_entry_in_order(filer->entries, &filer->count, MAX_ENTRIES, &entry);
+
+  add_entry_in_order(
+    filer->entries,
+    &filer->count,
+    MAX_ENTRIES,
+    &entry
+  );
 
   snprintf(
     filer->message,
@@ -1754,7 +2092,7 @@ run_filer_task(void *task_parameter) {
           : target_path
       );
 
-      area512_switch_shared_stack_task(
+      area512_replace_current_task(
         ACTION_TASK_NAME,
         run_action_task,
         filer
@@ -1779,7 +2117,7 @@ run_filer_task(void *task_parameter) {
         target_path
       );
 
-      area512_switch_shared_stack_task(
+      area512_replace_current_task(
         ACTION_TASK_NAME,
         run_action_task,
         filer
@@ -1788,7 +2126,12 @@ run_filer_task(void *task_parameter) {
       break;
 
     case ACTION_EDIT_DOT:
-      edit_dot(target_path, filer->message, MESSAGE_MAX);
+      edit_dot(
+        target_path,
+        filer->message,
+        MESSAGE_MAX
+      );
+
       break;
 
     case ACTION_NEW_FILE:
@@ -1812,7 +2155,12 @@ run_filer_task(void *task_parameter) {
       break;
 
     case ACTION_DELETE:
-      delete_entry(target_path, filer->message, MESSAGE_MAX);
+      delete_entry(
+        target_path,
+        filer->message,
+        MESSAGE_MAX
+      );
+
       break;
 
     case ACTION_MOVE:
@@ -1846,15 +2194,28 @@ run_filer_task(void *task_parameter) {
       break;
 
     case ACTION_INSTALL_APP_IMAGE:
-      area512_install_app_image(target_path, filer->message, MESSAGE_MAX);
+      area512_install_app_image(
+        target_path,
+        filer->message,
+        MESSAGE_MAX
+      );
+
       break;
 
     case ACTION_LAUNCH_INSTALLED_APP:
-      area512_launch_installed_app(filer->message, MESSAGE_MAX);
+      area512_launch_installed_app(
+        filer->message,
+        MESSAGE_MAX
+      );
+
       break;
 
     case ACTION_UNINSTALL_APP:
-      area512_uninstall_app(filer->message, MESSAGE_MAX);
+      area512_uninstall_app(
+        filer->message,
+        MESSAGE_MAX
+      );
+
       break;
     }
 
@@ -1877,5 +2238,9 @@ area512_start_filer(void) {
   if (area512_default_ui_is_terminal())
     open_terminal_session(filer);
 
-  area512_start_shared_stack_task(FILER_TASK_NAME, run_filer_task, filer);
+  area512_start_replaceable_task(
+    FILER_TASK_NAME,
+    run_filer_task,
+    filer
+  );
 }

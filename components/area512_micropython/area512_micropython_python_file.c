@@ -22,7 +22,13 @@ static char *
 read_whole_file(const char *path, size_t *file_byte_length) {
   char resolved_path[AREA512_PATH_MAX];
 
-  if (area512_resolve_data_path(path, resolved_path, sizeof resolved_path) != 0)
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      sizeof resolved_path
+    ) != 0
+  )
     return NULL;
 
   FILE *file = fopen(resolved_path, "rb");
@@ -150,13 +156,13 @@ area512_micropython_compile_python_source_file(
   if (!python_source_bytes)
     return -1;
 
-  char resolved_python_bytecode_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (
     area512_resolve_data_path(
       python_bytecode_path,
-      resolved_python_bytecode_path,
-      sizeof resolved_python_bytecode_path
+      resolved_path,
+      sizeof resolved_path
     ) != 0
   ) {
 
@@ -166,7 +172,7 @@ area512_micropython_compile_python_source_file(
   }
 
   FILE *python_bytecode_file =
-    fopen(resolved_python_bytecode_path, "wb");
+    fopen(resolved_path, "wb");
 
   if (!python_bytecode_file) {
     free(python_source_bytes);
@@ -176,7 +182,11 @@ area512_micropython_compile_python_source_file(
 
   int micropython_stack_top;
 
-  mp_embed_init(gc_heap, gc_heap_byte_size, &micropython_stack_top);
+  mp_embed_init(
+    gc_heap,
+    gc_heap_byte_size,
+    &micropython_stack_top
+  );
 
   int compile_result =
     compile_python_source_to_bytecode(
@@ -197,7 +207,7 @@ area512_micropython_compile_python_source_file(
     compile_result = -1;
 
   if (compile_result != 0)
-    remove(resolved_python_bytecode_path);
+    remove(resolved_path);
 
   return compile_result;
 }
@@ -285,7 +295,11 @@ run_manifest_entries(const char *directory_path, char *manifest_text) {
   char *entry_name;
 
   while (
-    (entry_name = area512_split_next_manifest_entry(&manifest_cursor)) != NULL
+    (
+      entry_name =
+        area512_read_next_manifest_entry(
+          &manifest_cursor)
+        ) != NULL
   ) {
 
     int entry_result = run_manifest_entry(directory_path, entry_name);

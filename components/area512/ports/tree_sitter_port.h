@@ -3,6 +3,5 @@
 
 void area512_route_tree_sitter_allocations_to_mrubyc_pool(void);
 void area512_register_tree_sitter_parse_budget(void);
-void area512_clear_tree_sitter_allocation_byte_size(void);
 
 #endif

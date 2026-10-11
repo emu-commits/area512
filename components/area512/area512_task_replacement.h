@@ -9,13 +9,13 @@
 extern "C" {
 #endif
 
-void area512_start_shared_stack_task(
+void area512_start_replaceable_task(
   const char *task_name,
   TaskFunction_t task_function,
   void *task_parameter
 );
 
-void area512_switch_shared_stack_task(
+void area512_replace_current_task(
   const char *task_name,
   TaskFunction_t task_function,
   void *task_parameter

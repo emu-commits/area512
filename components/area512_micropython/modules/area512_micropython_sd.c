@@ -123,7 +123,11 @@ static mp_obj_t
 make_sd_directory_if_absent(mp_obj_t path_object) {
   char resolved_path[AREA512_PATH_MAX];
 
-  resolve_path_or_raise(path_object, resolved_path, sizeof resolved_path);
+  resolve_path_or_raise(
+    path_object,
+    resolved_path,
+    sizeof resolved_path
+  );
 
   if (mkdir(resolved_path, 0777) != 0 && errno != EEXIST)
     mp_raise_OSError(errno);
@@ -139,7 +143,11 @@ static mp_obj_t
 read_whole_sd_file(mp_obj_t path_object) {
   char resolved_path[AREA512_PATH_MAX];
 
-  resolve_path_or_raise(path_object, resolved_path, sizeof resolved_path);
+  resolve_path_or_raise(
+    path_object,
+    resolved_path,
+    sizeof resolved_path
+  );
 
   struct stat stat_buffer;
 
@@ -179,7 +187,11 @@ static mp_obj_t
 write_whole_sd_file(mp_obj_t path_object, mp_obj_t content_object) {
   char resolved_path[AREA512_PATH_MAX];
 
-  resolve_path_or_raise(path_object, resolved_path, sizeof resolved_path);
+  resolve_path_or_raise(
+    path_object,
+    resolved_path,
+    sizeof resolved_path
+  );
 
   size_t content_byte_length;
   const char *content =
@@ -271,10 +283,17 @@ create_file_object(
                        : "r";
   char resolved_path[AREA512_PATH_MAX];
 
-  resolve_path_or_raise(arguments[0], resolved_path, sizeof resolved_path);
+  resolve_path_or_raise(
+    arguments[0],
+    resolved_path,
+    sizeof resolved_path
+  );
 
   area512_micropython_file_instance_t *file_instance =
-    mp_obj_malloc_with_finaliser(area512_micropython_file_instance_t, file_type);
+    mp_obj_malloc_with_finaliser(
+      area512_micropython_file_instance_t,
+      file_type
+    );
 
   file_instance->file_pointer = NULL;
 
@@ -293,7 +312,11 @@ static mp_obj_t
 unlink_file(mp_obj_t path_object) {
   char resolved_path[AREA512_PATH_MAX];
 
-  resolve_path_or_raise(path_object, resolved_path, sizeof resolved_path);
+  resolve_path_or_raise(
+    path_object,
+    resolved_path,
+    sizeof resolved_path
+  );
 
   if (unlink(resolved_path) != 0)
     mp_raise_OSError(errno);
@@ -304,22 +327,22 @@ static MP_DEFINE_CONST_FUN_OBJ_1(unlink_file_callable, unlink_file);
 
 static mp_obj_t
 rename_file(mp_obj_t source_path_object, mp_obj_t destination_path_object) {
-  char resolved_source_path[AREA512_PATH_MAX];
-  char resolved_destination_path[AREA512_PATH_MAX];
+  char source_resolved_path[AREA512_PATH_MAX];
+  char destination_resolved_path[AREA512_PATH_MAX];
 
   resolve_path_or_raise(
     source_path_object,
-    resolved_source_path,
-    sizeof resolved_source_path
+    source_resolved_path,
+    sizeof source_resolved_path
   );
 
   resolve_path_or_raise(
     destination_path_object,
-    resolved_destination_path,
-    sizeof resolved_destination_path
+    destination_resolved_path,
+    sizeof destination_resolved_path
   );
 
-  if (rename(resolved_source_path, resolved_destination_path) != 0)
+  if (rename(source_resolved_path, destination_resolved_path) != 0)
     mp_raise_OSError(errno);
 
   return MP_OBJ_NEW_SMALL_INT(0);
@@ -410,7 +433,11 @@ create_directory_object(
 
   char resolved_path[AREA512_PATH_MAX];
 
-  resolve_path_or_raise(arguments[0], resolved_path, sizeof resolved_path);
+  resolve_path_or_raise(
+    arguments[0],
+    resolved_path,
+    sizeof resolved_path
+  );
 
   area512_micropython_directory_instance_t *directory_instance =
     mp_obj_malloc_with_finaliser(
@@ -434,7 +461,11 @@ static mp_obj_t
 make_directory(mp_obj_t path_object) {
   char resolved_path[AREA512_PATH_MAX];
 
-  resolve_path_or_raise(path_object, resolved_path, sizeof resolved_path);
+  resolve_path_or_raise(
+    path_object,
+    resolved_path,
+    sizeof resolved_path
+  );
 
   if (mkdir(resolved_path, 0777) != 0)
     mp_raise_OSError(errno);
@@ -447,7 +478,11 @@ static mp_obj_t
 remove_directory(mp_obj_t path_object) {
   char resolved_path[AREA512_PATH_MAX];
 
-  resolve_path_or_raise(path_object, resolved_path, sizeof resolved_path);
+  resolve_path_or_raise(
+    path_object,
+    resolved_path,
+    sizeof resolved_path
+  );
 
   if (rmdir(resolved_path) != 0)
     mp_raise_OSError(errno);

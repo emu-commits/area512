@@ -813,12 +813,18 @@ area512_gfx_load_header_image(
   if (path == nullptr || bitmap == nullptr)
     return 0;
 
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (area512_resolve_data_path(path, full_path, sizeof full_path) != 0)
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      sizeof resolved_path
+    ) != 0
+  )
     return 0;
 
-  FILE *file = fopen(full_path, "rb");
+  FILE *file = fopen(resolved_path, "rb");
 
   if (file == nullptr)
     return 0;

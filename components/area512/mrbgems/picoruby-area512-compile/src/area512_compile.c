@@ -22,14 +22,21 @@ read_whole_file(
   const char **exception_message
 ) {
 
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (area512_resolve_data_path(path, full_path, sizeof full_path) != 0) {
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      sizeof resolved_path
+    ) != 0
+  ) {
+
     *exception_message = "invalid path";
     return NULL;
   }
 
-  FILE *file = fopen(full_path, "rb");
+  FILE *file = fopen(resolved_path, "rb");
 
   if (!file) {
     *exception_message = strerror(errno);
@@ -82,14 +89,21 @@ write_whole_file(
   const char **exception_message
 ) {
 
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (area512_resolve_data_path(path, full_path, sizeof full_path) != 0) {
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      sizeof resolved_path
+    ) != 0
+  ) {
+
     *exception_message = "invalid path";
     return false;
   }
 
-  FILE *file = fopen(full_path, "wb");
+  FILE *file = fopen(resolved_path, "wb");
 
   if (!file) {
     *exception_message = strerror(errno);

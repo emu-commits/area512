@@ -1,5 +1,5 @@
 // Minimal libc-backed File/Dir for Ruby apps, require.rb and Sandbox;
-// Ruby-visible paths are rooted at AREA512_DATA_ROOT ("/" == the data root).
+// Ruby-visible paths are rooted at AREA512_ROOT_PATH ("/" == the data root).
 
 #include <stdint.h>
 
@@ -25,13 +25,20 @@ resolve_path_argument(
   mrbc_vm *virtual_machine,
   mrbc_value v[],
   int argument_index,
-  char *buffer,
-  size_t buffer_size
+  char *resolved_path,
+  size_t resolved_path_size
 ) {
 
   const char *path = (const char *)GET_STRING_ARG(argument_index);
 
-  if (area512_resolve_data_path(path, buffer, buffer_size) != 0) {
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      resolved_path_size
+    ) != 0
+  ) {
+
     mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "invalid path");
     return false;
   }
@@ -42,12 +49,18 @@ resolve_path_argument(
 static bool
 stat_path(mrbc_value v[], struct stat *stat_buffer) {
   const char *path = (const char *)GET_STRING_ARG(1);
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (area512_resolve_data_path(path, full_path, sizeof full_path) != 0)
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      sizeof resolved_path
+    ) != 0
+  )
     return false;
 
-  return stat(full_path, stat_buffer) == 0;
+  return stat(resolved_path, stat_buffer) == 0;
 }
 
 static void
@@ -78,18 +91,18 @@ c_file_is_directory(
 
 static void
 c_file_unlink(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (!resolve_path_argument(
         virtual_machine,
         v,
         1,
-        full_path,
-        sizeof full_path
+        resolved_path,
+        sizeof resolved_path
       ))
     return;
 
-  if (unlink(full_path) != 0) {
+  if (unlink(resolved_path) != 0) {
     raise_errno(virtual_machine);
     return;
   }
@@ -132,18 +145,18 @@ static void
 c_file_new(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
   const char *mode =
     argument_count >= 2 ? (const char *)GET_STRING_ARG(2) : "r";
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (!resolve_path_argument(
         virtual_machine,
         v,
         1,
-        full_path,
-        sizeof full_path
+        resolved_path,
+        sizeof resolved_path
       ))
     return;
 
-  FILE *file = fopen(full_path, strcmp(mode, "w") == 0 ? "wb" : "rb");
+  FILE *file = fopen(resolved_path, strcmp(mode, "w") == 0 ? "wb" : "rb");
 
   if (file == NULL) {
     raise_errno(virtual_machine);
@@ -242,18 +255,18 @@ c_dir_is_exist(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
 
 static void
 c_dir_mkdir(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (!resolve_path_argument(
         virtual_machine,
         v,
         1,
-        full_path,
-        sizeof full_path
+        resolved_path,
+        sizeof resolved_path
       ))
     return;
 
-  if (mkdir(full_path, 0777) != 0) {
+  if (mkdir(resolved_path, 0777) != 0) {
     raise_errno(virtual_machine);
     return;
   }
@@ -263,18 +276,18 @@ c_dir_mkdir(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
 
 static void
 c_dir_rmdir(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (!resolve_path_argument(
         virtual_machine,
         v,
         1,
-        full_path,
-        sizeof full_path
+        resolved_path,
+        sizeof resolved_path
       ))
     return;
 
-  if (rmdir(full_path) != 0) {
+  if (rmdir(resolved_path) != 0) {
     raise_errno(virtual_machine);
     return;
   }
@@ -284,18 +297,18 @@ c_dir_rmdir(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
 
 static void
 c_dir_new(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (!resolve_path_argument(
         virtual_machine,
         v,
         1,
-        full_path,
-        sizeof full_path
+        resolved_path,
+        sizeof resolved_path
       ))
     return;
 
-  DIR *directory = opendir(full_path);
+  DIR *directory = opendir(resolved_path);
 
   if (directory == NULL) {
     raise_errno(virtual_machine);

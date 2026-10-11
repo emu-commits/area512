@@ -18,9 +18,9 @@ build_panel_info(PanelInfo *panel_information) {
   panel_information->label[0] = "BAT";
   panel_information->percent[0] = battery;
 
-  int virtual_machine_percent = area512_metrics_arena_used_pct();
+  int arena_percent = area512_metrics_arena_used_pct();
   panel_information->label[1] = "ARN";
-  panel_information->percent[1] = virtual_machine_percent;
+  panel_information->percent[1] = arena_percent;
 
   int ram_percent = area512_metrics_dram_used_pct();
   panel_information->label[2] = "RAM";

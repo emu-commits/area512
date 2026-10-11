@@ -111,14 +111,21 @@ read_whole_file(
   const char **exception_message
 ) {
 
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (area512_resolve_data_path(path, full_path, sizeof full_path) != 0) {
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      sizeof resolved_path
+    ) != 0
+  ) {
+
     *exception_message = "invalid path";
     return NULL;
   }
 
-  FILE *file = fopen(full_path, "rb");
+  FILE *file = fopen(resolved_path, "rb");
 
   if (!file) {
     *exception_message = strerror(errno);
@@ -164,7 +171,7 @@ read_whole_file(
 }
 
 static int
-execute_mrb_code_keep(
+prepare_sandbox_task_for_run(
   SandboxState *sandbox_state,
   uint8_t *code,
   size_t size,
@@ -243,7 +250,7 @@ execute_mrb_code_keep(
 }
 
 static void
-c_sandbox_area512_exec_mrb_file_keep(
+c_sandbox_area512_prepare_task_for_run(
   mrbc_vm *virtual_machine,
   mrbc_value *v,
   int argument_count
@@ -269,7 +276,14 @@ c_sandbox_area512_exec_mrb_file_keep(
     return;
   }
 
-  if (execute_mrb_code_keep(sandbox_state, code, size, &exception_message)) {
+  if (
+    prepare_sandbox_task_for_run(
+      sandbox_state,
+      code,
+      size,
+      &exception_message
+    )
+  ) {
     SET_TRUE_RETURN();
     return;
   }
@@ -488,7 +502,12 @@ area512_run_sandbox_mrb_file(
 
   if (
     code &&
-    !execute_mrb_code_keep(sandbox_state, code, size, &load_exception_message)
+    !prepare_sandbox_task_for_run(
+      sandbox_state,
+      code,
+      size,
+      &load_exception_message
+    )
   ) {
 
     mrbc_raw_free(code);
@@ -524,7 +543,9 @@ area512_run_sandbox_mrb_file(
   }
 
   s_running_sandbox_state = sandbox_state;
+
   mrbc_run();
+
   s_running_sandbox_state = NULL;
 
   if (s_terminating_signal_status != MACHINE_SIG_NONE) {
@@ -593,7 +614,7 @@ area512_run_sandbox_manifest(
 
   while (
     run_result == AREA512_SANDBOX_RUN_COMPLETED &&
-    (entry_name = area512_split_next_manifest_entry(&manifest_cursor)) != NULL
+    (entry_name = area512_read_next_manifest_entry(&manifest_cursor)) != NULL
   ) {
 
     area512_join_manifest_entry_path(
@@ -666,8 +687,8 @@ mrbc_area512_sandbox_init(mrbc_vm *virtual_machine) {
   mrbc_define_method(
     virtual_machine,
     class_Sandbox,
-    "area512_exec_mrb_file_keep",
-    c_sandbox_area512_exec_mrb_file_keep
+    "area512_prepare_task_for_run",
+    c_sandbox_area512_prepare_task_for_run
   );
 
   mrbc_define_method(

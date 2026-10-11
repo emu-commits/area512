@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 char *
-area512_split_next_manifest_entry(char **manifest_cursor) {
+area512_read_next_manifest_entry(char **manifest_cursor) {
   char *line_start = *manifest_cursor;
 
   while (*line_start) {

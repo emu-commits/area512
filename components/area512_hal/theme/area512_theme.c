@@ -138,18 +138,18 @@ assign_theme_from_line(char *line) {
 
 void
 area512_theme_load(void) {
-  char path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (
     area512_resolve_data_path(
       THEME_PATH,
-      path,
-      sizeof(path)
+      resolved_path,
+      sizeof(resolved_path)
     ) < 0
   )
     return;
 
-  FILE *file = fopen(path, "r");
+  FILE *file = fopen(resolved_path, "r");
 
   if (file == NULL)
     return;

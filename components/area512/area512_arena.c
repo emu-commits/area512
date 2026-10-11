@@ -1,8 +1,25 @@
 #include "area512_arena.h"
 
+#include <mrubyc.h>
+
 uint8_t g_area512_arena[AREA512_ARENA_BYTE_SIZE] __attribute__((aligned(8)));
 
 static int s_recorded_arena_used_byte_size;
+
+void
+area512_init_arena(void) {
+  mrbc_init(g_area512_arena, AREA512_ARENA_BYTE_SIZE);
+}
+
+void
+area512_detach_arena(void) {
+  struct MRBC_ALLOC_STATISTICS statistics;
+
+  mrbc_alloc_statistics(&statistics);
+  area512_record_arena_used_byte_size((int)statistics.used);
+
+  mrbc_cleanup();
+}
 
 void
 area512_record_arena_used_byte_size(int arena_used_byte_size) {

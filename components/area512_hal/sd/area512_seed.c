@@ -117,9 +117,9 @@ find_seed_directory_index(const char *entry_name) {
 }
 
 bool
-area512_ensure_parent_directories(char *full_path) {
+area512_ensure_parent_directories(char *resolved_path) {
   for (
-    char *cursor = full_path + strlen(AREA512_DATA_ROOT) + 1;
+    char *cursor = resolved_path + strlen(AREA512_ROOT_PATH) + 1;
     *cursor;
     cursor++
   ) {
@@ -130,7 +130,7 @@ area512_ensure_parent_directories(char *full_path) {
 
     *cursor = '\0';
 
-    bool created = area512_ensure_directory(full_path);
+    bool created = area512_ensure_directory(resolved_path);
 
     *cursor = '/';
 
@@ -145,21 +145,21 @@ area512_ensure_parent_directories(char *full_path) {
 static bool
 write_seed_file(const char *relative_path, const uint8_t *data, size_t size) {
 
-  char full_path[sizeof(AREA512_DATA_ROOT) + TAR_NAME_SIZE + 1];
+  char resolved_path[sizeof(AREA512_ROOT_PATH) + TAR_NAME_SIZE + 1];
 
   snprintf(
-    full_path,
-    sizeof(full_path),
+    resolved_path,
+    sizeof(resolved_path),
     "%s/%s",
-    AREA512_DATA_ROOT,
+    AREA512_ROOT_PATH,
     relative_path
   );
 
-  if (!area512_ensure_parent_directories(full_path)) {
+  if (!area512_ensure_parent_directories(resolved_path)) {
     return false;
   }
 
-  FILE *file = fopen(full_path, "wb");
+  FILE *file = fopen(resolved_path, "wb");
 
   if (file == NULL) {
     return false;
@@ -191,13 +191,13 @@ extract_seed_entry(const TarEntry *entry) {
     return true;
   }
 
-  char directory_path[sizeof(AREA512_DATA_ROOT) + TAR_NAME_SIZE + 1];
+  char directory_path[sizeof(AREA512_ROOT_PATH) + TAR_NAME_SIZE + 1];
 
   snprintf(
     directory_path,
     sizeof(directory_path),
     "%s/%s",
-    AREA512_DATA_ROOT,
+    AREA512_ROOT_PATH,
     entry->name
   );
 
@@ -317,20 +317,20 @@ remove_tree(const char *path) {
 
 int
 area512_seed_restore(void) {
-  if (!area512_ensure_directory(AREA512_DATA_ROOT)) {
+  if (!area512_ensure_directory(AREA512_ROOT_PATH)) {
     return -1;
   }
 
   bool restore[SEED_DIRECTORY_COUNT];
 
   for (size_t i = 0; i < SEED_DIRECTORY_COUNT; i++) {
-    char directory_path[sizeof(AREA512_DATA_ROOT) + TAR_NAME_SIZE + 1];
+    char directory_path[sizeof(AREA512_ROOT_PATH) + TAR_NAME_SIZE + 1];
 
     snprintf(
       directory_path,
       sizeof(directory_path),
       "%s/%s",
-      AREA512_DATA_ROOT,
+      AREA512_ROOT_PATH,
       s_seed_directories[i]
     );
 
@@ -374,13 +374,13 @@ area512_seed_update(void) {
 
   while ((next_cursor = read_tar_entry(cursor, &entry)) != NULL) {
     if (entry_is_app_directory(&entry)) {
-      char app_directory_path[sizeof(AREA512_DATA_ROOT) + TAR_NAME_SIZE + 1];
+      char app_directory_path[sizeof(AREA512_ROOT_PATH) + TAR_NAME_SIZE + 1];
 
       snprintf(
         app_directory_path,
         sizeof(app_directory_path),
         "%s/%s",
-        AREA512_DATA_ROOT,
+        AREA512_ROOT_PATH,
         entry.name
       );
 

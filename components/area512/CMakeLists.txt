@@ -36,7 +36,7 @@ idf_component_register(
   SRCS
     ${COMPONENT_DIR}/area512.c
     ${COMPONENT_DIR}/area512_arena.c
-    ${COMPONENT_DIR}/area512_shared_stack.c
+    ${COMPONENT_DIR}/area512_task_replacement.c
     ${COMPONENT_DIR}/area512_ruby_vm.c
     ${COMPONENT_DIR}/filer_shell.c
     ${COMPONENT_DIR}/ports/tree_sitter_port.c
