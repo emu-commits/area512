@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define REDRAW_INTERVAL_MS 16
+
 static void
 set_message(Filer *filer, const char *text) {
   strncpy(filer->message, text, MESSAGE_MAX - 1);
@@ -71,7 +73,12 @@ run_filer_interaction(Filer *filer) {
 
     draw_all(filer);
 
-    int key = area512_filer_read_key();
+    int key = read_filer_key_with_timeout(REDRAW_INTERVAL_MS);
+
+    filer->has_key_wait_timed_out = (key == KEY_NONE);
+
+    if (filer->has_key_wait_timed_out)
+      continue;
 
     FileEntry *entry = fetch_selected_entry(filer);
 

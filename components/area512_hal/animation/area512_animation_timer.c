@@ -1,4 +1,4 @@
-#include "area512_hal.h"
+#include "area512_animation_timer.h"
 
 #include <math.h>
 
@@ -7,6 +7,14 @@
 int64_t
 area512_read_uptime_ms(void) {
   return esp_timer_get_time() / 1000;
+}
+
+AnimationTimer
+area512_start_animation_timer(int64_t duration_ms) {
+  return (AnimationTimer){
+    .started_at_ms = area512_read_uptime_ms(),
+    .duration_ms = duration_ms,
+  };
 }
 
 int64_t

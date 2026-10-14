@@ -76,6 +76,7 @@
 #define TARGET_INVALID 1
 #define TARGET_MISSING 2
 
+#define KEY_NONE 1000
 #define KEY_UP 1001
 #define KEY_DOWN 1002
 #define KEY_RIGHT 1003
@@ -104,18 +105,24 @@ typedef struct Terminal Terminal;
 
 typedef struct {
   int valid;
-  int index, top, count;
+  int index, count;
   int draws_window_frame;
-  FileEntry entries[ROWS_VISIBLE];
   char current_directory[CURRENT_DIRECTORY_MAX];
   char message[MESSAGE_MAX];
-  int panel_percent[PANEL_MAX_METRICS];
 } FilerDrawState;
+
+typedef struct {
+  int count;
+  const char *label[PANEL_MAX_METRICS];
+  int percent[PANEL_MAX_METRICS];
+} PanelInfo;
 
 typedef struct {
   void *row;
   void *screen;
   int index, top, count, full_redraw;
+  int has_key_wait_timed_out;
+  PanelInfo panel_info;
   int draws_window_frame;
   int has_background_image;
   FilerDrawState drawn;
@@ -165,6 +172,7 @@ void fit_string(
 );
 
 int area512_filer_read_key(void);
+int read_filer_key_with_timeout(int timeout_ms);
 int read_raw_text_key(void);
 int read_terminal_key(void);
 void area512_filer_setup_ui(Filer *filer);

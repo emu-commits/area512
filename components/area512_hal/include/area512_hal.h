@@ -38,27 +38,13 @@ int area512_metrics_stack_used_pct(void);
 int area512_metrics_dram_free_byte_size(void);
 int area512_metrics_stack_free_byte_size(void);
 
-typedef struct {
-  int64_t started_at_ms;
-  int64_t duration_ms;
-} AnimationTimer;
-
-int64_t area512_read_uptime_ms(void);
-int64_t area512_compute_animation_elapsed_ms(
-  AnimationTimer animation_timer,
-  int64_t now_ms
+void area512_start_filer_cursor_animation(void);
+void area512_draw_filer_cursor_animation(
+  void *sprite,
+  int x,
+  int y,
+  uint32_t color
 );
-float area512_compute_animation_progress(
-  AnimationTimer animation_timer,
-  int64_t now_ms
-);
-bool area512_is_animation_over(AnimationTimer animation_timer, int64_t now_ms);
-float area512_compute_progress_between(
-  float progress,
-  float start_progress,
-  float end_progress
-);
-float area512_compute_ease_out_progress(float progress);
 
 void *area512_sprite_new(int w, int h);
 void *area512_sprite_new_with_font_size(int w, int h, int font_size);

@@ -70,9 +70,14 @@ clamp_index(Filer *filer) {
 
 void
 move_cursor(Filer *filer, int delta) {
+  int previous_index = filer->index;
+
   filer->message[0] = 0;
   filer->index += delta;
   clamp_index(filer);
+
+  if (filer->index != previous_index)
+    area512_start_filer_cursor_animation();
 }
 
 void
@@ -80,8 +85,10 @@ jump_to(Filer *filer, int offset) {
   filer->message[0] = 0;
   int index = filer->top + offset;
 
-  if (index < filer->count)
+  if (index < filer->count && index != filer->index) {
     filer->index = index;
+    area512_start_filer_cursor_animation();
+  }
 }
 
 static int

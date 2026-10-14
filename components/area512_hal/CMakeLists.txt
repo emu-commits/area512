@@ -26,6 +26,7 @@ idf_component_register(
     usb/area512_usb_receive.c
     ota/area512_app_image.c
     animation/area512_animation_timer.c
+    animation/filer_cursor_animation.c
   INCLUDE_DIRS
     include
     console

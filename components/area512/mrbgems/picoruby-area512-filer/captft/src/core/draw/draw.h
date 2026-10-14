@@ -5,14 +5,8 @@
 
 #define PANEL_TITLE "SYS 0x200"
 
-typedef struct {
-  int count;
-  const char *label[PANEL_MAX_METRICS];
-  int percent[PANEL_MAX_METRICS];
-} PanelInfo;
-
-void find_changed_rows(Filer *filer, const PanelInfo *info, uint8_t *rows);
-void save_draw_state(Filer *filer, const PanelInfo *info);
+void find_changed_rows(Filer *filer, uint8_t *rows);
+void save_draw_state(Filer *filer);
 
 void draw_frame(Filer *filer);
 void draw_header(Filer *filer);

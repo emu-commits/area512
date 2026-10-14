@@ -72,12 +72,12 @@ draw_all(Filer *filer) {
 
   adjust_scroll(filer);
 
-  PanelInfo panel_info;
-  build_panel_info(&panel_info);
+  if (!filer->has_key_wait_timed_out)
+    build_panel_info(&filer->panel_info);
 
   uint8_t changed_rows[SCREEN_HEIGHT];
 
-  find_changed_rows(filer, &panel_info, changed_rows);
+  find_changed_rows(filer, changed_rows);
 
   int draw_background = 1;
   int background_failed = 0;
@@ -139,7 +139,7 @@ draw_all(Filer *filer) {
         HEADER_HEIGHT + row * ROW_HEIGHT,
         filer->top + row,
         row,
-        &panel_info
+        &filer->panel_info
       );
 
       row++;
@@ -163,7 +163,7 @@ draw_all(Filer *filer) {
   filer->screen = 0;
   filer->full_redraw = 0;
 
-  save_draw_state(filer, &panel_info);
+  save_draw_state(filer);
 
   filer->drawn.valid = !background_failed;
 }
