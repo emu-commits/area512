@@ -25,6 +25,7 @@ idf_component_register(
     ui/area512_default_ui.c
     usb/area512_usb_receive.c
     ota/area512_app_image.c
+    animation/area512_animation_timer.c
   INCLUDE_DIRS
     include
     console
@@ -43,6 +44,7 @@ idf_component_register(
     app_update
     bootloader_support
     esp_partition
+    esp_timer
 )
 
 # area512 requires this component, so its directory is a private include

@@ -1,6 +1,6 @@
 #include "system_metrics.h"
 
-#include "area512_shared_stack.h"
+#include "area512_task_replacement.h"
 
 #if !defined(AREA512_TDECK)
 #include <M5Unified.hpp>
