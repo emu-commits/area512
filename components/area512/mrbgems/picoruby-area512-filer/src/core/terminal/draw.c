@@ -39,8 +39,8 @@ scroll_visible_input_to_cursor(
       terminal->input_cursor_byte_offset - available_input_byte_count + 1;
 }
 
-static void
-draw_prompt_row(Filer *filer) {
+void
+draw_terminal_prompt_row(Filer *filer) {
   char prompt_text[LINE_MAX];
   int prompt_byte_count;
   int available_input_byte_count;
@@ -103,12 +103,11 @@ draw_prompt_row(Filer *filer) {
     area512_theme_text_color()
   );
 
-  area512_sprite_text(
+  area512_draw_filer_terminal_cursor_animation(
     filer->row,
     TERMINAL_CONTENT_LEFT_X +
       (prompt_byte_count + visible_cursor_byte_offset) * FILER_CHAR_WIDTH,
     0,
-    "_",
     area512_theme_selected_color()
   );
 
@@ -157,7 +156,7 @@ draw_terminal(Filer *filer) {
     output_row_index++;
   }
 
-  draw_prompt_row(filer);
+  draw_terminal_prompt_row(filer);
 }
 
 #endif

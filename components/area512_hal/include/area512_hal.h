@@ -45,6 +45,13 @@ void area512_draw_filer_cursor_animation(
   int y,
   uint32_t color
 );
+void area512_start_filer_terminal_cursor_animation(void);
+void area512_draw_filer_terminal_cursor_animation(
+  void *sprite,
+  int x,
+  int y,
+  uint32_t color
+);
 
 void *area512_sprite_new(int w, int h);
 void *area512_sprite_new_with_font_size(int w, int h, int font_size);

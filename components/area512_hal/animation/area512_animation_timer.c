@@ -46,6 +46,19 @@ area512_is_animation_over(AnimationTimer animation_timer, int64_t now_ms) {
   return area512_compute_animation_progress(animation_timer, now_ms) >= 1.0f;
 }
 
+bool
+area512_is_in_first_half_of_animation_cycle(
+  AnimationTimer animation_timer,
+  int64_t now_ms
+) {
+
+  int64_t elapsed_ms =
+    area512_compute_animation_elapsed_ms(animation_timer, now_ms);
+
+  return elapsed_ms % animation_timer.duration_ms <
+         animation_timer.duration_ms / 2;
+}
+
 float
 area512_compute_progress_between(
   float progress,

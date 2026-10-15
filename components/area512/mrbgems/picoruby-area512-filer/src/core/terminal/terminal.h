@@ -37,6 +37,7 @@ int run_terminal_session(Filer *filer);
 void close_terminal_session(Filer *filer);
 
 void draw_terminal(Filer *filer);
+void draw_terminal_prompt_row(Filer *filer);
 
 void append_output_text(Terminal *terminal, const char *text);
 void clear_output_lines(Terminal *terminal);

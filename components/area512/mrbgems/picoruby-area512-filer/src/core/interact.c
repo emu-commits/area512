@@ -7,8 +7,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define REDRAW_INTERVAL_MS 16
-
 static void
 set_message(Filer *filer, const char *text) {
   strncpy(filer->message, text, MESSAGE_MAX - 1);

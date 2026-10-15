@@ -19,6 +19,10 @@ float area512_compute_animation_progress(
   int64_t now_ms
 );
 bool area512_is_animation_over(AnimationTimer animation_timer, int64_t now_ms);
+bool area512_is_in_first_half_of_animation_cycle(
+  AnimationTimer animation_timer,
+  int64_t now_ms
+);
 float area512_compute_progress_between(
   float progress,
   float start_progress,

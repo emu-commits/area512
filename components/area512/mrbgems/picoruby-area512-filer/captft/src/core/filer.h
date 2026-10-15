@@ -76,6 +76,8 @@
 #define TARGET_INVALID 1
 #define TARGET_MISSING 2
 
+#define REDRAW_INTERVAL_MS 16
+
 #define KEY_NONE 1000
 #define KEY_UP 1001
 #define KEY_DOWN 1002
@@ -175,6 +177,7 @@ int area512_filer_read_key(void);
 int read_filer_key_with_timeout(int timeout_ms);
 int read_raw_text_key(void);
 int read_terminal_key(void);
+int read_terminal_key_with_timeout(int timeout_ms);
 void area512_filer_setup_ui(Filer *filer);
 void area512_filer_teardown_ui(Filer *filer);
 

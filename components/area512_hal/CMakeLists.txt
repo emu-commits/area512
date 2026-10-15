@@ -27,6 +27,7 @@ idf_component_register(
     ota/area512_app_image.c
     animation/area512_animation_timer.c
     animation/filer_cursor_animation.c
+    animation/filer_terminal_cursor_animation.c
   INCLUDE_DIRS
     include
     console

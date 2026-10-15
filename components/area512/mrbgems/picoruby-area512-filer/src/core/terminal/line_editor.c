@@ -1,5 +1,6 @@
 #if defined(PICORB_VM_MRUBYC)
 
+#include "area512_hal.h"
 #include "core/terminal/terminal.h"
 
 #include <string.h>
@@ -120,10 +121,18 @@ read_terminal_input_line(Filer *filer) {
   terminal->history_recall_index = terminal->history_line_count;
   terminal->completion_match_index = -1;
 
-  for (;;) {
-    draw_terminal(filer);
+  area512_start_filer_terminal_cursor_animation();
+  draw_terminal(filer);
 
-    input_key = read_terminal_key();
+  for (;;) {
+    input_key = read_terminal_key_with_timeout(REDRAW_INTERVAL_MS);
+
+    if (input_key == KEY_NONE) {
+      draw_terminal_prompt_row(filer);
+      continue;
+    }
+
+    area512_start_filer_terminal_cursor_animation();
 
     if (input_key != '\t')
       terminal->completion_match_index = -1;
@@ -149,6 +158,8 @@ read_terminal_input_line(Filer *filer) {
       move_input_cursor(terminal, 1);
     else if (input_key >= ' ' && input_key <= '~')
       insert_character_at_cursor(terminal, (char)input_key);
+
+    draw_terminal(filer);
   }
 }
 
