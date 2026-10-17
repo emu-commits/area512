@@ -3,7 +3,7 @@
 #include "area512_animation_timer.h"
 #include "filer_window_box.h"
 
-#define WINDOW_CLOSE_DURATION_MS 1100
+#define WINDOW_CLOSE_DURATION_MS 800
 #define SQUEEZE_END_PROGRESS 0.4f
 #define LIT_LINE_SHRINK_START_PROGRESS 0.6f
 
@@ -21,13 +21,17 @@ draw_squeezing_window_box(
   float progress
 ) {
 
-  float eased_progress =
+  float eased_open_progress =
     area512_compute_ease_out_progress(
-      area512_compute_progress_between(progress, 0.0f, SQUEEZE_END_PROGRESS)
+      area512_compute_progress_between(
+        1.0f - progress,
+        1.0f - SQUEEZE_END_PROGRESS,
+        1.0f
+      )
     );
 
   int body_height =
-    area512_interpolate_linearly(height, LIT_LINE_HEIGHT, eased_progress);
+    area512_interpolate_linearly(LIT_LINE_HEIGHT, height, eased_open_progress);
 
   area512_draw_filer_window_box(
     sprite,
@@ -44,7 +48,7 @@ draw_squeezing_window_box(
     width,
     height,
     width,
-    (int)(eased_progress * 100.0f)
+    (int)((1.0f - eased_open_progress) * 100.0f)
   );
 }
 

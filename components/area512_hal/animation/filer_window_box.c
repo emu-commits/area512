@@ -4,7 +4,7 @@
 
 #include "area512_hal.h"
 
-#define LIT_LINE_WHITE_PERCENT 50
+#define LIT_LINE_WHITE_PERCENT 70
 
 int
 area512_interpolate_linearly(int from, int to, float fraction) {
