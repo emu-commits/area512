@@ -4,6 +4,7 @@
 
 #include "area512_hal.h"
 #include "core/filer.h"
+#include "core/terminal/terminal.h"
 #include "io-console.h"
 
 void
@@ -31,10 +32,49 @@ area512_filer_teardown_ui(Filer *filer) {
   }
 }
 
+static int
+is_window_opening_action(int action) {
+  switch (action) {
+  case ACTION_RUN_RUBY:
+  case ACTION_RUN_PYTHON:
+  case ACTION_RUN_DIR:
+  case ACTION_EDIT:
+  case ACTION_EDIT_DOT:
+  case ACTION_VIEW_MARKDOWN:
+  case ACTION_IRB:
+  case ACTION_PYTHON_REPL:
+  case ACTION_RECEIVE_FILES:
+  case ACTION_INSTALL_APP_IMAGE:
+  case ACTION_UNINSTALL_APP:
+    return 1;
+
+  default:
+    return 0;
+  }
+}
+
+void
+draw_current_screen(void *context) {
+  Filer *filer = context;
+
+  if (filer->terminal)
+    draw_terminal(filer);
+  else
+    draw_all(filer);
+}
+
 int
 read_filer_action(Filer *filer) {
   area512_filer_setup_ui(filer);
   clamp_index(filer);
+
+  if (filer->is_window_open) {
+    filer->is_window_open = 0;
+
+    area512_start_filer_window_close_animation(draw_current_screen, filer);
+
+    filer->full_redraw = 1;
+  }
 
   // Raw so Ctrl-C/Ctrl-Z reach the filer as bytes instead of becoming signals.
   io_raw_bang(false);
@@ -42,6 +82,18 @@ read_filer_action(Filer *filer) {
   int action = run_filer_interaction(filer);
 
   io_cooked_bang();
+
+  if (is_window_opening_action(action)) {
+    area512_filer_setup_ui(filer);
+    filer->is_window_open = 1;
+
+    if (filer->terminal)
+      filer->full_redraw = 0;
+
+    area512_start_filer_window_open_animation(draw_current_screen, filer);
+    draw_current_screen(filer);
+    area512_filer_teardown_ui(filer);
+  }
 
   return action;
 }

@@ -9,7 +9,38 @@
 #define AUTOSUGGESTION_TEXT_COLOR_PERCENT 40
 
 static void
+draw_window_over_row(Filer *filer, int row_top) {
+  if (area512_is_filer_window_open_animation_running())
+    area512_draw_filer_window_open_animation(
+      filer->row,
+      -1,
+      -1 - row_top,
+      AREA512_WINDOW_WIDTH + 2,
+      AREA512_WINDOW_HEIGHT + 2
+    );
+  else if (filer->is_window_open)
+    draw_window_box(
+      filer->row,
+      -1,
+      -1 - row_top,
+      AREA512_WINDOW_WIDTH + 2,
+      AREA512_WINDOW_HEIGHT + 2
+    );
+
+  if (area512_is_filer_window_close_animation_running())
+    area512_draw_filer_window_close_animation(
+      filer->row,
+      -1,
+      -1 - row_top,
+      AREA512_WINDOW_WIDTH + 2,
+      AREA512_WINDOW_HEIGHT + 2
+    );
+}
+
+static void
 draw_terminal_output_row(Filer *filer, int output_row_index) {
+  int row_top = output_row_index * ROW_HEIGHT;
+
   area512_sprite_fill(filer->row, area512_theme_background_color());
 
   area512_sprite_text(
@@ -20,7 +51,24 @@ draw_terminal_output_row(Filer *filer, int output_row_index) {
     area512_theme_text_color()
   );
 
-  area512_sprite_push(filer->row, 0, output_row_index * ROW_HEIGHT);
+  draw_window_over_row(filer, row_top);
+
+  area512_sprite_push(filer->row, 0, row_top);
+}
+
+static void
+draw_blank_rows_below_prompt(Filer *filer) {
+  int row_top = (filer->terminal->output_row_count + 1) * ROW_HEIGHT;
+
+  while (row_top < AREA512_WINDOW_HEIGHT) {
+    area512_sprite_fill(filer->row, area512_theme_background_color());
+
+    draw_window_over_row(filer, row_top);
+
+    area512_sprite_push(filer->row, 0, row_top);
+
+    row_top += ROW_HEIGHT;
+  }
 }
 
 static void
@@ -50,6 +98,7 @@ draw_terminal_prompt_row(Filer *filer) {
   char autosuggestion[LINE_MAX];
   int available_autosuggestion_byte_count;
   char visible_autosuggestion_text[LINE_MAX];
+  int prompt_row_top;
 
   snprintf(
     prompt_text,
@@ -133,11 +182,11 @@ draw_terminal_prompt_row(Filer *filer) {
     );
   }
 
-  area512_sprite_push(
-    filer->row,
-    0,
-    filer->terminal->output_row_count * ROW_HEIGHT
-  );
+  prompt_row_top = filer->terminal->output_row_count * ROW_HEIGHT;
+
+  draw_window_over_row(filer, prompt_row_top);
+
+  area512_sprite_push(filer->row, 0, prompt_row_top);
 }
 
 void
@@ -159,6 +208,13 @@ draw_terminal(Filer *filer) {
   }
 
   draw_terminal_prompt_row(filer);
+
+  if (
+    filer->is_window_open ||
+    area512_is_filer_window_open_animation_running() ||
+    area512_is_filer_window_close_animation_running()
+  )
+    draw_blank_rows_below_prompt(filer);
 }
 
 #endif

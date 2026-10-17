@@ -140,3 +140,24 @@ draw_header(Filer *filer) {
     area512_theme_text_color()
   );
 }
+
+void
+draw_window_box(void *sprite, int left, int top, int width, int height) {
+  area512_sprite_fill_rect(
+    sprite,
+    left,
+    top,
+    width,
+    height,
+    area512_theme_background_color()
+  );
+
+  area512_sprite_rect(
+    sprite,
+    left,
+    top,
+    width,
+    height,
+    area512_theme_border_color()
+  );
+}

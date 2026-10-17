@@ -11,6 +11,9 @@ find_changed_rows(Filer *filer, uint8_t *rows) {
   if (
     filer->full_redraw ||
     !drawn->valid ||
+    filer->is_window_open ||
+    area512_is_filer_window_open_animation_running() ||
+    area512_is_filer_window_close_animation_running() ||
     !area512_theme_background_image()[0]
   ) {
 

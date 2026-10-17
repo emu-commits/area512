@@ -11,8 +11,8 @@ find_changed_rows(Filer *filer, uint8_t *rows) {
   if (
     filer->full_redraw ||
     !drawn->valid ||
-    filer->draws_window_frame ||
-    drawn->draws_window_frame ||
+    area512_is_filer_window_open_animation_running() ||
+    area512_is_filer_window_close_animation_running() ||
     !area512_theme_background_image()[0]
   ) {
 
@@ -40,7 +40,6 @@ save_draw_state(Filer *filer) {
 
   drawn->index = filer->index;
   drawn->count = filer->count;
-  drawn->draws_window_frame = filer->draws_window_frame;
 
   memcpy(
     drawn->current_directory,

@@ -5,6 +5,7 @@
 
 #define THEME_PATH "etc/theme"
 #define THEME_LINE_BYTES 64
+#define WHITE_COLOR 0xFFFFFF
 
 typedef struct {
   char background_image[THEME_LINE_BYTES];
@@ -32,15 +33,34 @@ luminance(uint32_t color) {
 
 static uint32_t
 blend_color_channel(
-  int background_channel,
-  int text_channel,
-  int text_color_percent
+  int under_channel,
+  int over_channel,
+  int over_color_percent
 ) {
 
   return (uint32_t)(
-    background_channel +
-    (text_channel - background_channel) * text_color_percent / 100
+    under_channel + (over_channel - under_channel) * over_color_percent / 100
   );
+}
+
+static uint32_t
+blend_color(uint32_t under_color, uint32_t over_color, int over_color_percent) {
+  return
+    (blend_color_channel(
+      (under_color >> 16) & 0xFF,
+      (over_color >> 16) & 0xFF,
+      over_color_percent
+    ) << 16) |
+    (blend_color_channel(
+      (under_color >> 8) & 0xFF,
+      (over_color >> 8) & 0xFF,
+      over_color_percent
+    ) << 8) |
+    blend_color_channel(
+      under_color & 0xFF,
+      over_color & 0xFF,
+      over_color_percent
+    );
 }
 
 static int
@@ -199,25 +219,16 @@ area512_theme_box_color(void) {
 
 uint32_t
 area512_theme_blend_text_color_over_background(int text_color_percent) {
-  uint32_t background_color = s_theme.background_color;
-  uint32_t text_color = s_theme.text_color;
+  return blend_color(
+    s_theme.background_color,
+    s_theme.text_color,
+    text_color_percent
+  );
+}
 
-  return
-    (blend_color_channel(
-      (background_color >> 16) & 0xFF,
-      (text_color >> 16) & 0xFF,
-      text_color_percent
-    ) << 16) |
-    (blend_color_channel(
-      (background_color >> 8) & 0xFF,
-      (text_color >> 8) & 0xFF,
-      text_color_percent
-    ) << 8) |
-    blend_color_channel(
-      background_color & 0xFF,
-      text_color & 0xFF,
-      text_color_percent
-    );
+uint32_t
+area512_theme_blend_white_over_emphasis_color(int white_percent) {
+  return blend_color(s_theme.emphasis_color, WHITE_COLOR, white_percent);
 }
 
 // Bitmaps are authored with the set bits as the brighter side, so a light

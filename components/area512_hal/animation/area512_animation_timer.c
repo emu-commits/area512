@@ -65,7 +65,10 @@ area512_compute_progress_between(
   float start_progress,
   float end_progress
 ) {
-  return (progress - start_progress) / (end_progress - start_progress);
+  float progress_between =
+    (progress - start_progress) / (end_progress - start_progress);
+
+  return fmaxf(0.0f, fminf(progress_between, 1.0f));
 }
 
 float

@@ -105,6 +105,7 @@ typedef struct {
   int index, top, count, full_redraw;
   int has_key_wait_timed_out;
   PanelInfo panel_info;
+  int is_window_open;
   int has_background_image;
   FilerDrawState drawn;
   char current_directory[CURRENT_DIRECTORY_MAX];
@@ -173,3 +174,5 @@ int read_yes_no_confirmation(Filer *filer, const char *question);
 int run_filer_interaction(Filer *filer);
 int read_filer_action(Filer *filer);
 void draw_all(Filer *filer);
+void draw_current_screen(void *context);
+void draw_window_box(void *sprite, int left, int top, int width, int height);

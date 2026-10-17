@@ -111,6 +111,26 @@ draw_all(Filer *filer) {
     draw_frame(filer);
     draw_header(filer);
 
+    if (area512_is_filer_window_open_animation_running())
+      area512_draw_filer_window_open_animation(
+        filer->screen,
+        0,
+        0,
+        filer->width - 1,
+        filer->height
+      );
+    else if (filer->terminal || filer->is_window_open)
+      draw_window_box(filer->screen, 0, 0, filer->width - 1, filer->height);
+
+    if (area512_is_filer_window_close_animation_running())
+      area512_draw_filer_window_close_animation(
+        filer->screen,
+        0,
+        0,
+        filer->width - 1,
+        filer->height
+      );
+
     area512_screen_push_region(filer->screen);
 
     changed_first_row += changed_row_count;

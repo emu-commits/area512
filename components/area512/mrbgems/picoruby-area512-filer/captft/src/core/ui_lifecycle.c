@@ -4,6 +4,7 @@
 
 #include "area512_hal.h"
 #include "core/filer.h"
+#include "core/terminal/terminal.h"
 #include "io-console.h"
 
 void
@@ -33,10 +34,28 @@ area512_filer_teardown_ui(Filer *filer) {
   }
 }
 
+void
+draw_current_screen(void *context) {
+  Filer *filer = context;
+
+  if (filer->terminal)
+    draw_terminal(filer);
+  else
+    draw_all(filer);
+}
+
 int
 read_filer_action(Filer *filer) {
   area512_filer_setup_ui(filer);
   clamp_index(filer);
+
+  if (filer->is_window_open) {
+    filer->is_window_open = 0;
+
+    area512_start_filer_window_close_animation(draw_current_screen, filer);
+
+    filer->full_redraw = 1;
+  }
 
   // Raw so Ctrl-C/Ctrl-Z reach the filer as bytes instead of becoming signals.
   io_raw_bang(false);
@@ -58,7 +77,16 @@ read_filer_action(Filer *filer) {
   case ACTION_INSTALL_APP_IMAGE:
   case ACTION_UNINSTALL_APP:
     area512_filer_setup_ui(filer);
-    area512_filer_open_window(filer);
+    filer->is_window_open = 1;
+
+    if (filer->terminal) {
+      area512_filer_set_gfx_window();
+      filer->full_redraw = 0;
+    }
+
+    area512_start_filer_window_open_animation(draw_current_screen, filer);
+    draw_current_screen(filer);
+    area512_filer_set_gfx_window();
     area512_filer_teardown_ui(filer);
 
     break;

@@ -52,6 +52,30 @@ void area512_draw_filer_terminal_cursor_animation(
   int y,
   uint32_t color
 );
+void area512_start_filer_window_open_animation(
+  void (*draw_screen)(void *context),
+  void *context
+);
+bool area512_is_filer_window_open_animation_running(void);
+void area512_draw_filer_window_open_animation(
+  void *sprite,
+  int left,
+  int top,
+  int width,
+  int height
+);
+void area512_start_filer_window_close_animation(
+  void (*draw_screen)(void *context),
+  void *context
+);
+bool area512_is_filer_window_close_animation_running(void);
+void area512_draw_filer_window_close_animation(
+  void *sprite,
+  int left,
+  int top,
+  int width,
+  int height
+);
 
 void *area512_sprite_new(int w, int h);
 void *area512_sprite_new_with_font_size(int w, int h, int font_size);
@@ -174,6 +198,7 @@ uint32_t area512_theme_border_color(void);
 uint32_t area512_theme_selected_color(void);
 uint32_t area512_theme_box_color(void);
 uint32_t area512_theme_blend_text_color_over_background(int text_color_percent);
+uint32_t area512_theme_blend_white_over_emphasis_color(int white_percent);
 void area512_theme_pick_bitmap_colors(
   uint32_t *set_bit_color,
   uint32_t *clear_bit_color

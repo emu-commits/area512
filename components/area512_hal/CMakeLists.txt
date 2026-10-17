@@ -28,6 +28,9 @@ idf_component_register(
     animation/area512_animation_timer.c
     animation/filer_cursor_animation.c
     animation/filer_terminal_cursor_animation.c
+    animation/filer_window_box.c
+    animation/filer_window_open_animation.c
+    animation/filer_window_close_animation.c
   INCLUDE_DIRS
     include
     console

@@ -129,6 +129,7 @@ read_terminal_input_line(Filer *filer) {
 
     if (input_key == KEY_NONE) {
       draw_terminal_prompt_row(filer);
+
       continue;
     }
 
