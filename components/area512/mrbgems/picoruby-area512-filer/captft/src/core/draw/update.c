@@ -2,6 +2,50 @@
 
 #include <string.h>
 
+static void
+find_changed_entry_rows(Filer *filer, uint8_t *rows) {
+  FilerDrawState *drawn = &filer->drawn;
+  PanelInfo *panel_info = &filer->panel_info;
+  int panel_changed = 0;
+
+  for (int metric = 0; metric < panel_info->count; metric++) {
+    if (panel_info->percent[metric] != drawn->panel_percent[metric])
+      panel_changed = 1;
+  }
+
+  for (int row = 0; row < ROWS_VISIBLE; row++) {
+    int index = filer->top + row;
+    int old_index = drawn->top + row;
+    int present = index < filer->count;
+    int old_present = old_index < drawn->count;
+    int selected = present && index == filer->index;
+
+    int changed =
+      selected ||
+      filer->top != drawn->top ||
+      filer->count != drawn->count ||
+      present != old_present ||
+      (old_present && old_index == drawn->index);
+
+    if (present && old_present) {
+      FileEntry *entry = &filer->entries[index];
+      FileEntry *old_entry = &drawn->entries[row];
+
+      if (
+        entry->type != old_entry->type ||
+        strcmp(entry->name, old_entry->name) != 0
+      )
+        changed = 1;
+    }
+
+    if (panel_changed && panel_covers_row(row))
+      changed = 1;
+
+    if (changed)
+      memset(rows + HEADER_HEIGHT + row * ROW_HEIGHT, 1, ROW_HEIGHT);
+  }
+}
+
 void
 find_changed_rows(Filer *filer, uint8_t *rows) {
   FilerDrawState *drawn = &filer->drawn;
@@ -32,7 +76,7 @@ find_changed_rows(Filer *filer, uint8_t *rows) {
   )
     memset(rows + WINDOW_TOP - 1, 1, AREA512_WINDOW_HEIGHT + 2);
   else
-    memset(rows + HEADER_HEIGHT, 1, ROWS_VISIBLE * ROW_HEIGHT);
+    find_changed_entry_rows(filer, rows);
 
   if (strcmp(filer->message, drawn->message) != 0)
     memset(rows + BAR1_Y, 1, BAR_HEIGHT);
@@ -43,6 +87,7 @@ save_draw_state(Filer *filer) {
   FilerDrawState *drawn = &filer->drawn;
 
   drawn->index = filer->index;
+  drawn->top = filer->top;
   drawn->count = filer->count;
 
   memcpy(
@@ -52,4 +97,14 @@ save_draw_state(Filer *filer) {
   );
 
   memcpy(drawn->message, filer->message, MESSAGE_MAX);
+
+  for (int row = 0; row < ROWS_VISIBLE; row++) {
+    int index = filer->top + row;
+
+    if (index < filer->count)
+      drawn->entries[row] = filer->entries[index];
+  }
+
+  for (int metric = 0; metric < filer->panel_info.count; metric++)
+    drawn->panel_percent[metric] = filer->panel_info.percent[metric];
 }

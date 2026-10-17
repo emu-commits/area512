@@ -107,9 +107,11 @@ typedef struct Terminal Terminal;
 
 typedef struct {
   int valid;
-  int index, count;
+  int index, top, count;
+  FileEntry entries[ROWS_VISIBLE];
   char current_directory[CURRENT_DIRECTORY_MAX];
   char message[MESSAGE_MAX];
+  int panel_percent[PANEL_MAX_METRICS];
 } FilerDrawState;
 
 typedef struct {
