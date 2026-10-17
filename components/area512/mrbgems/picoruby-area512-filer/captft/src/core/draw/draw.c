@@ -2,9 +2,6 @@
 
 #include <string.h>
 
-#define WINDOW_LEFT ((SCREEN_WIDTH - AREA512_WINDOW_WIDTH) / 2)
-#define WINDOW_TOP ((FRAME_TOP + BAR1_Y - AREA512_WINDOW_HEIGHT) / 2)
-
 static int
 compute_corner_inset(int dy, int radius) {
   if (dy <= 0)

@@ -3,7 +3,11 @@
 #include "area512_animation_timer.h"
 #include "filer_window_box.h"
 
+#if defined(AREA512_EXT_DISPLAY)
+#define WINDOW_OPEN_DURATION_MS 1080
+#else
 #define WINDOW_OPEN_DURATION_MS 800
+#endif
 #define LIT_LINE_GROW_END_PROGRESS 0.4f
 #define BOX_OPEN_START_PROGRESS 0.6f
 

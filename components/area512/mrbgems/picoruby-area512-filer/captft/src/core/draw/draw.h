@@ -5,6 +5,9 @@
 
 #define PANEL_TITLE "SYS 0x200"
 
+#define WINDOW_LEFT ((SCREEN_WIDTH - AREA512_WINDOW_WIDTH) / 2)
+#define WINDOW_TOP ((FRAME_TOP + BAR1_Y - AREA512_WINDOW_HEIGHT) / 2)
+
 void find_changed_rows(Filer *filer, uint8_t *rows);
 void save_draw_state(Filer *filer);
 

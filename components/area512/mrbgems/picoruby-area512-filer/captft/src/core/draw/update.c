@@ -11,8 +11,6 @@ find_changed_rows(Filer *filer, uint8_t *rows) {
   if (
     filer->full_redraw ||
     !drawn->valid ||
-    area512_is_filer_window_open_animation_running() ||
-    area512_is_filer_window_close_animation_running() ||
     !area512_theme_background_image()[0]
   ) {
 
@@ -28,7 +26,13 @@ find_changed_rows(Filer *filer, uint8_t *rows) {
   )
     memset(rows, 1, HEADER_HEIGHT);
 
-  memset(rows + HEADER_HEIGHT, 1, ROWS_VISIBLE * ROW_HEIGHT);
+  if (
+    area512_is_filer_window_open_animation_running() ||
+    area512_is_filer_window_close_animation_running()
+  )
+    memset(rows + WINDOW_TOP - 1, 1, AREA512_WINDOW_HEIGHT + 2);
+  else
+    memset(rows + HEADER_HEIGHT, 1, ROWS_VISIBLE * ROW_HEIGHT);
 
   if (strcmp(filer->message, drawn->message) != 0)
     memset(rows + BAR1_Y, 1, BAR_HEIGHT);
