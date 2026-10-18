@@ -164,6 +164,55 @@ rake build:tdeck
 idf.py -B build/tdeck flash
 ```
 
+## T-Deck Plus Keymap
+
+> [!NOTE]
+> Key bindings on the T-Deck Plus are tricky, so refer to this map.
+> On the Cardputer, keys type what their labels show.
+
+Both Shift keys behave the same. Sym, Alt, and Shift output nothing on their own.
+
+| Key | Plain | Shift | Sym | Sym + Shift | Alt |
+| --- | --- | --- | --- | --- | --- |
+| `q` | `q` | `Q` | `#` | `=` | Ctrl-Q |
+| `w` | `w` | `W` | `1` | Ctrl-Q | Ctrl-W |
+| `e` | `e` | `E` | `2` | Ctrl-R | Ctrl-E |
+| `r` | `r` | `R` | `3` | Ctrl-S | Ctrl-R |
+| `t` | `t` | `T` | `(` | Backspace | Tab |
+| `y` | `y` | `Y` | `)` | Tab | Ctrl-Y |
+| `u` | `u` | `U` | `_` | `?` | Ctrl-U |
+| `i` | `i` | `I` | `-` | Enter | Tab |
+| `o` | `o` | `O` | `+` | Ctrl-K | Ctrl-O |
+| `p` | `p` | `P` | `@` | Space | Ctrl-P |
+| `a` | `a` | `A` | `*` | Ctrl-J | Ctrl-A |
+| `s` | `s` | `S` | `4` | Ctrl-T | Ctrl-S |
+| `d` | `d` | `D` | `5` | Ctrl-D | Ctrl-D |
+| `f` | `f` | `F` | `6` | Ctrl-V | Ctrl-F |
+| `g` | `g` | `G` | `/` | `[` | Ctrl-G |
+| `h` | `h` | `H` | `:` | `]` | Backspace |
+| `j` | `j` | `J` | `;` | Esc | Esc |
+| `k` | `k` | `K` | `'` | Ctrl-G | Ctrl-K |
+| `l` | `l` | `L` | `"` | Ctrl-B | Ctrl-L |
+| `z` | `z` | `Z` | `7` | `<` | `<` |
+| `x` | `x` | `X` | `8` | `>` | `>` |
+| `c` | `c` | `C` | `9` | Ctrl-C | Ctrl-C |
+| `v` | `v` | `V` | `?` | `{` | Ctrl-V |
+| `b` | `b` | `B` | `!` | `}` | Ctrl-B |
+| `n` | `n` | `N` | `,` | Ctrl-N | Ctrl-N |
+| `m` | `m` | `M` | `.` | Ctrl-N | Enter |
+| `$` | `$` | Ctrl-D | — | `\|` | — |
+| Space | Space | NUL | — | `\|` | NUL |
+| Mic | `=` | Ctrl-] | `0` | Ctrl-P | — |
+| Enter | Enter | Enter | Enter | Enter | Enter |
+| Backspace | Backspace | Backspace | Backspace | Backspace | Backspace |
+
+While Alt is held, Shift and Sym change nothing, except that Space then outputs nothing.
+
+| Trackball | Output |
+| --- | --- |
+| Roll up / down / left / right | Up / Down / Left / Right arrow |
+| Press | Enter |
+
 ## Contributing
 
 AREA512 welcomes contributions of new apps and AREA512 artwork (splash images and such)!
