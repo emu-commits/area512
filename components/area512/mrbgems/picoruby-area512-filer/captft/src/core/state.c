@@ -1,5 +1,6 @@
 #if defined(PICORB_VM_MRUBYC)
 
+#include "area512_hal.h"
 #include "core/filer.h"
 
 #include <stddef.h>
@@ -29,9 +30,14 @@ clamp_index(Filer *filer) {
 
 void
 move_cursor(Filer *filer, int delta) {
+  int previous_index = filer->index;
+
   filer->message[0] = 0;
   filer->index += delta;
   clamp_index(filer);
+
+  if (filer->index != previous_index)
+    area512_start_filer_cursor_animation();
 }
 
 void
@@ -39,8 +45,10 @@ jump_to(Filer *filer, int offset) {
   filer->message[0] = 0;
   int index = filer->top + offset;
 
-  if (index < filer->count)
+  if (index < filer->count && index != filer->index) {
     filer->index = index;
+    area512_start_filer_cursor_animation();
+  }
 }
 
 static int
@@ -78,7 +86,7 @@ add_entry_in_order(
   (*entry_count)++;
 }
 
-static int
+int
 has_path_suffix(const char *path, const char *suffix) {
   size_t path_byte_length = strlen(path);
   size_t suffix_byte_length = strlen(suffix);

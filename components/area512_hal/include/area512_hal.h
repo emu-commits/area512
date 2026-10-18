@@ -9,11 +9,15 @@ extern "C" {
 #endif
 
 // Ruby-visible paths are rooted here: "/" in Ruby means this directory.
-#define AREA512_DATA_ROOT "/sdcard/Area512_data"
+#define AREA512_ROOT_PATH "/sdcard/Area512_data"
 #define AREA512_PATH_MAX 256
 
 int
-area512_resolve_data_path(const char *path, char *buffer, size_t buffer_size);
+area512_resolve_data_path(
+  const char *path,
+  char *resolved_path,
+  size_t resolved_path_size
+);
 
 void area512_console_poll(void);
 int area512_console_getchar(void);
@@ -23,14 +27,55 @@ int area512_console_getch_timeout(int timeout_ms);
 void area512_console_write(const void *buffer, int buffer_byte_count);
 void area512_console_reset(void);
 int area512_console_had_output(void);
+void area512_console_wait_key_if_output(void);
 int area512_console_cursor_row_index(void);
 int area512_console_row_height(void);
 int area512_console_font_size(void);
 
 int area512_metrics_battery_percent(void);
-int area512_metrics_vm_used_pct(void);
 int area512_metrics_dram_used_pct(void);
 int area512_metrics_stack_used_pct(void);
+int area512_metrics_dram_free_byte_size(void);
+int area512_metrics_stack_free_byte_size(void);
+
+void area512_start_filer_cursor_animation(void);
+void area512_draw_filer_cursor_animation(
+  void *sprite,
+  int x,
+  int y,
+  uint32_t color
+);
+void area512_start_filer_terminal_cursor_animation(void);
+void area512_draw_filer_terminal_cursor_animation(
+  void *sprite,
+  int x,
+  int y,
+  uint32_t color
+);
+void area512_start_filer_window_open_animation(
+  void (*draw_screen)(void *context),
+  void *context
+);
+bool area512_is_filer_window_open_animation_running(void);
+void area512_draw_filer_window_open_animation(
+  void *sprite,
+  int left,
+  int top,
+  int width,
+  int height
+);
+void area512_start_filer_window_close_animation(
+  void (*draw_screen)(void *context),
+  void *context
+);
+bool area512_is_filer_window_close_animation_running(void);
+void area512_draw_filer_window_close_animation(
+  void *sprite,
+  int left,
+  int top,
+  int width,
+  int height
+);
 
 void *area512_sprite_new(int w, int h);
 void *area512_sprite_new_with_font_size(int w, int h, int font_size);
@@ -121,7 +166,15 @@ int area512_seed_restore(void);
 int area512_seed_update(void);
 const uint8_t *area512_seed_find_file(const char *path, size_t *size);
 bool area512_ensure_directory(const char *path);
-bool area512_ensure_parent_directories(char *full_path);
+bool area512_ensure_parent_directories(char *resolved_path);
+
+char *area512_read_next_manifest_entry(char **manifest_cursor);
+void area512_join_manifest_entry_path(
+  const char *directory_path,
+  const char *entry_name,
+  char *entry_path,
+  int entry_path_size
+);
 
 void area512_usb_receive_files(void);
 bool area512_usb_receive_owns_rxfifo(void);
@@ -144,7 +197,10 @@ uint32_t area512_theme_emphasis_color(void);
 uint32_t area512_theme_border_color(void);
 uint32_t area512_theme_selected_color(void);
 uint32_t area512_theme_box_color(void);
+bool area512_theme_is_crt_enabled(void);
 uint32_t area512_theme_blend_text_color_over_background(int text_color_percent);
+uint32_t area512_theme_blend_selected_color_over_background(int selected_color_percent);
+uint32_t area512_theme_blend_white_over_emphasis_color(int white_percent);
 void area512_theme_pick_bitmap_colors(
   uint32_t *set_bit_color,
   uint32_t *clear_bit_color

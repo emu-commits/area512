@@ -22,6 +22,9 @@ class Dot
   # Draw the dot image onto a sprite at (x, y); palette index 0 is skipped
   def push: ((Sprite | BandedSprite) sprite, Integer x, Integer y) -> nil
 
+  # Free the dot image memory immediately
+  def delete: () -> nil
+
   # Load a dot image (.a5d); the path is rooted at the card's data directory
   def self.load: (String path) -> Dot
 

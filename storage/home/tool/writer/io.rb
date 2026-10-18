@@ -1,5 +1,8 @@
+require 'machine'
 require 'io/console'
+require 'area512-sprite'
 require 'area512-sdfat'
+require 'area512-widget'
 
 def read_key
   input = nil

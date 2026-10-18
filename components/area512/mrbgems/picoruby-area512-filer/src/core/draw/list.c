@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define LABEL_OFFSET_COLUMNS 2
+
 // Scrollbar color for row; -1 if everything fits (no bar).
 static int
 scrollbar_color(Filer *filer, int row) {
@@ -66,30 +68,33 @@ draw_entry(Filer *filer, int y, int index, int row, const PanelInfo *info) {
     char label_text[NAME_MAX + 2];
     format_file_label(entry, label_text, sizeof label_text);
 
-    char line[LINE_MAX];
-
-    snprintf(
-      line,
-      sizeof line,
-      "%c %s",
-      selected ? '>' : ' ', label_text
-    );
-
     int list_columns =
       panel_covers_row(filer, row, info)
         ? filer->list_columns_panel
         : filer->columns;
 
-    char fitted[LINE_MAX];
-    fit_string(fitted, sizeof fitted, line, list_columns);
-
-    area512_sprite_text(
-      filer->row,
-      filer->content_x,
-      0,
-      fitted,
-      selected ? area512_theme_selected_color() : area512_theme_text_color()
+    char fitted_label[LINE_MAX];
+    fit_string(
+      fitted_label,
+      sizeof fitted_label,
+      label_text,
+      list_columns - LABEL_OFFSET_COLUMNS
     );
+
+    uint32_t text_color =
+      selected ? area512_theme_selected_color() : area512_theme_text_color();
+
+    if (selected)
+      area512_draw_filer_cursor_animation(
+        filer->row,
+        filer->content_x,
+        0,
+        text_color
+      );
+
+    int label_x = filer->content_x + LABEL_OFFSET_COLUMNS * FILER_CHAR_WIDTH;
+
+    area512_sprite_text(filer->row, label_x, 0, fitted_label, text_color);
   }
 
   int scrollbar = scrollbar_color(filer, row);

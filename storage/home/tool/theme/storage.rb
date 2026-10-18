@@ -2,6 +2,7 @@ class ThemeEditor
   def load_theme
     @colors = DEFAULT_COLORS.dup
     @background_image = ""
+    @crt_enabled = false
     return unless SD.exist?(THEME_PATH)
 
     SD.read(THEME_PATH).split("\n").each do |line|
@@ -20,6 +21,12 @@ class ThemeEditor
 
     if key == "background_image"
       @background_image = value
+      return
+    end
+
+    if key == "crt"
+      @crt_enabled = true if value == "on"
+      @crt_enabled = false if value == "off"
       return
     end
 
@@ -61,6 +68,7 @@ class ThemeEditor
       content += COLOR_KEYS[color_index] + "=" + format_hex_color(@colors[color_index]) + "\n"
       color_index += 1
     end
+    content += "crt=" + (@crt_enabled ? "on" : "off") + "\n"
 
     SD.write(THEME_PATH, content)
     @modified = false

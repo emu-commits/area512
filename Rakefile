@@ -82,6 +82,13 @@ namespace :build do
     idf_py "-B build/tft9341 -DSDKCONFIG=build/tft9341/sdkconfig " \
            "-DAREA512_CARDPUTER_V11=OFF -DAREA512_EXT_DISPLAY=ON -DAREA512_CAPTFT_ILI9341=ON build"
   end
+
+  desc "Build the T-Deck firmware with windows"
+  task :tdeck => :gendb do
+    idf_py "-B build/tdeck -DSDKCONFIG=build/tdeck/sdkconfig " \
+           "-DAREA512_CARDPUTER_V11=OFF -DAREA512_EXT_DISPLAY=ON -DAREA512_CAPTFT_ILI9341=OFF " \
+           "-DAREA512_TDECK=ON build"
+  end
 end
 
 desc "Flash the built firmware"

@@ -27,8 +27,7 @@ c_console_wait_key_if_output(
   (void)virtual_machine;
   (void)argument_count;
 
-  if (area512_console_had_output())
-    area512_console_getch_block();
+  area512_console_wait_key_if_output();
 
   SET_NIL_RETURN();
 }

@@ -1,4 +1,4 @@
-#if defined(AREA512_EXT_DISPLAY) && defined(PICORB_VM_MRUBYC)
+#if defined(AREA512_INTERNAL_DISPLAY) && defined(PICORB_VM_MRUBYC)
 
 #include "area512_markdown.h"
 #include "core/markdown/draw.h"
@@ -21,7 +21,7 @@ typedef struct {
   int previous_page_top_row;
 } InternalMarkdownPagination;
 
-static char internal_markdown_path_buffer[AREA512_PATH_MAX];
+static char resolved_path[AREA512_PATH_MAX];
 static int internal_markdown_page_top_row;
 static int internal_markdown_next_page_top_row;
 static int is_internal_markdown_shown;
@@ -204,7 +204,7 @@ draw_internal_markdown(
   *is_end_of_file_read = 0;
   *next_page_top_row = internal_markdown_page_top_row;
 
-  FILE *file = fopen(internal_markdown_path_buffer, "rb");
+  FILE *file = fopen(resolved_path, "rb");
   char *line = file ? (char *)malloc(MARKDOWN_LINE_BYTE_SIZE) : NULL;
 
   if (!line) {
@@ -288,9 +288,22 @@ draw_internal_markdown(
     draw_internal_markdown_error();
 }
 
+static void
+draw_internal_markdown_in_regions(void) {
+  while (area512_internal_display_begin_region()) {
+    draw_internal_markdown(
+      &is_internal_markdown_shown,
+      &is_internal_markdown_end_of_file_read,
+      &internal_markdown_next_page_top_row
+    );
+
+    area512_internal_display_push_region();
+  }
+}
+
 static int
 measure_previous_internal_markdown_page_top_row(void) {
-  FILE *file = fopen(internal_markdown_path_buffer, "rb");
+  FILE *file = fopen(resolved_path, "rb");
   char *line = file ? (char *)malloc(MARKDOWN_LINE_BYTE_SIZE) : NULL;
 
   if (!line) {
@@ -358,25 +371,25 @@ show_internal_markdown(const char *path) {
   if (
     area512_resolve_data_path(
       path,
-      internal_markdown_path_buffer,
-      sizeof(internal_markdown_path_buffer)
+      resolved_path,
+      sizeof(resolved_path)
     ) != 0
   ) {
 
     is_internal_markdown_shown = 0;
-    draw_internal_markdown_error();
+
+    while (area512_internal_display_begin_region()) {
+      draw_internal_markdown_error();
+      area512_internal_display_push_region();
+    }
+
     area512_internal_display_end();
 
     return 0;
   }
 
   internal_markdown_page_top_row = 0;
-
-  draw_internal_markdown(
-    &is_internal_markdown_shown,
-    &is_internal_markdown_end_of_file_read,
-    &internal_markdown_next_page_top_row
-  );
+  draw_internal_markdown_in_regions();
 
   area512_internal_display_end();
 
@@ -393,12 +406,7 @@ show_next_internal_markdown_page(void) {
 
   if (is_internal_markdown_shown && !is_internal_markdown_end_of_file_read) {
     internal_markdown_page_top_row = internal_markdown_next_page_top_row;
-
-    draw_internal_markdown(
-      &is_internal_markdown_shown,
-      &is_internal_markdown_end_of_file_read,
-      &internal_markdown_next_page_top_row
-    );
+    draw_internal_markdown_in_regions();
   }
 
   area512_internal_display_end();
@@ -416,11 +424,7 @@ show_previous_internal_markdown_page(void) {
     internal_markdown_page_top_row =
       measure_previous_internal_markdown_page_top_row();
 
-    draw_internal_markdown(
-      &is_internal_markdown_shown,
-      &is_internal_markdown_end_of_file_read,
-      &internal_markdown_next_page_top_row
-    );
+    draw_internal_markdown_in_regions();
   }
 
   area512_internal_display_end();
@@ -436,13 +440,17 @@ hide_internal_markdown(void) {
   int display_pixel_width = area512_internal_display_width();
   int display_pixel_height = area512_internal_display_height();
 
-  area512_internal_display_fill_rect(
-    0,
-    0,
-    display_pixel_width,
-    display_pixel_height,
-    area512_theme_background_color()
-  );
+  while (area512_internal_display_begin_region()) {
+    area512_internal_display_fill_rect(
+      0,
+      0,
+      display_pixel_width,
+      display_pixel_height,
+      area512_theme_background_color()
+    );
+
+    area512_internal_display_push_region();
+  }
 
   area512_internal_display_end();
 }

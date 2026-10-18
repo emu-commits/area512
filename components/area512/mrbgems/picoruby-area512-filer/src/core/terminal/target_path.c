@@ -100,7 +100,7 @@ append_path_components(
   return 0;
 }
 
-static int
+int
 stat_data_path(const char *absolute_path, struct stat *stat_buffer) {
   char resolved_path[AREA512_PATH_MAX];
 

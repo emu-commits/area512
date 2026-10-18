@@ -1,3 +1,4 @@
+require 'machine'
 require 'io/console'
 
 def read_char

@@ -22,12 +22,21 @@ free_dram(void) {
   )heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 }
 
+#if defined(AREA512_TDECK)
+// T-Deck microSD slot pins.
+#define AREA512_SD_PIN_SCK 40
+#define AREA512_SD_PIN_MISO 38
+#define AREA512_SD_PIN_MOSI 41
+#define AREA512_SD_PIN_CS 39
+#define AREA512_SD_SPI_HOST SPI2_HOST // shared with the display
+#else
 // Cardputer TF slot pins.
 #define AREA512_SD_PIN_SCK 40
 #define AREA512_SD_PIN_MISO 39
 #define AREA512_SD_PIN_MOSI 14
 #define AREA512_SD_PIN_CS 12
 #define AREA512_SD_SPI_HOST SPI2_HOST // shared with Cap TFT; internal display uses SPI3
+#endif
 #define AREA512_SD_FREQ_KHZ 20000     // stable on Cardputer SD
 
 static sdmmc_card_t *s_card = NULL;
@@ -53,7 +62,7 @@ area512_sd_mount(const char *base_path) {
   unsigned int dram0 = free_dram();
   ESP_LOGI(TAG, "[heap] before mount: internal free=%u", dram0);
 
-  // Cap TFT initializes SPI2 before the first SD mount, including MISO.
+  // The display initializes SPI2 before the first SD mount, including MISO.
 #if !defined(AREA512_EXT_DISPLAY)
   if (!s_bus_inited) {
     spi_bus_config_t bus_cfg = {

@@ -22,7 +22,13 @@ static char *
 read_whole_file(const char *path, size_t *file_byte_length) {
   char resolved_path[AREA512_PATH_MAX];
 
-  if (area512_resolve_data_path(path, resolved_path, sizeof resolved_path) != 0)
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      sizeof resolved_path
+    ) != 0
+  )
     return NULL;
 
   FILE *file = fopen(resolved_path, "rb");
@@ -134,7 +140,9 @@ compile_python_source_to_bytecode(
 int
 area512_micropython_compile_python_source_file(
   const char *python_source_path,
-  const char *python_bytecode_path
+  const char *python_bytecode_path,
+  void *gc_heap,
+  size_t gc_heap_byte_size
 ) {
 
   size_t python_source_byte_length = 0;
@@ -148,13 +156,13 @@ area512_micropython_compile_python_source_file(
   if (!python_source_bytes)
     return -1;
 
-  char resolved_python_bytecode_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (
     area512_resolve_data_path(
       python_bytecode_path,
-      resolved_python_bytecode_path,
-      sizeof resolved_python_bytecode_path
+      resolved_path,
+      sizeof resolved_path
     ) != 0
   ) {
 
@@ -164,21 +172,9 @@ area512_micropython_compile_python_source_file(
   }
 
   FILE *python_bytecode_file =
-    fopen(resolved_python_bytecode_path, "wb");
+    fopen(resolved_path, "wb");
 
   if (!python_bytecode_file) {
-    free(python_source_bytes);
-
-    return -1;
-  }
-
-  size_t micropython_gc_heap_byte_size = 0;
-  void *micropython_gc_heap =
-    area512_micropython_allocate_gc_heap(&micropython_gc_heap_byte_size);
-
-  if (!micropython_gc_heap) {
-    fclose(python_bytecode_file);
-    remove(resolved_python_bytecode_path);
     free(python_source_bytes);
 
     return -1;
@@ -187,8 +183,8 @@ area512_micropython_compile_python_source_file(
   int micropython_stack_top;
 
   mp_embed_init(
-    micropython_gc_heap,
-    micropython_gc_heap_byte_size,
+    gc_heap,
+    gc_heap_byte_size,
     &micropython_stack_top
   );
 
@@ -200,18 +196,18 @@ area512_micropython_compile_python_source_file(
       python_bytecode_file
     );
 
+  area512_micropython_record_gc_heap_used_byte_size();
   gc_sweep_all();
   mp_embed_deinit();
   area512_micropython_free_gc_heap_split_areas();
 
-  free(micropython_gc_heap);
   free(python_source_bytes);
 
   if (fclose(python_bytecode_file) != 0)
     compile_result = -1;
 
   if (compile_result != 0)
-    remove(resolved_python_bytecode_path);
+    remove(resolved_path);
 
   return compile_result;
 }
@@ -264,16 +260,12 @@ static int
 run_manifest_entry(const char *directory_path, const char *entry_name) {
   char entry_path[AREA512_PATH_MAX];
 
-  if (entry_name[0] == '/')
-    snprintf(entry_path, sizeof entry_path, "%s", entry_name);
-  else
-    snprintf(
-      entry_path,
-      sizeof entry_path,
-      "%s/%s",
-      directory_path,
-      entry_name
-    );
+  area512_join_manifest_entry_path(
+    directory_path,
+    entry_name,
+    entry_path,
+    sizeof entry_path
+  );
 
   size_t python_bytecode_byte_length = 0;
 
@@ -299,45 +291,33 @@ run_manifest_entry(const char *directory_path, const char *entry_name) {
 
 static int
 run_manifest_entries(const char *directory_path, char *manifest_text) {
-  char *line_start = manifest_text;
+  char *manifest_cursor = manifest_text;
+  char *entry_name;
 
-  while (*line_start) {
-    char *line_end = line_start;
+  while (
+    (
+      entry_name =
+        area512_read_next_manifest_entry(
+          &manifest_cursor)
+        ) != NULL
+  ) {
 
-    while (*line_end && *line_end != '\n')
-      line_end++;
+    int entry_result = run_manifest_entry(directory_path, entry_name);
 
-    char *next_line_start = *line_end ? line_end + 1 : line_end;
-
-    while (
-      line_end > line_start &&
-      (line_end[-1] == '\r' || line_end[-1] == ' ' || line_end[-1] == '\t')
-    ) {
-
-      line_end--;
-    }
-
-    *line_end = '\0';
-
-    while (*line_start == ' ' || *line_start == '\t')
-      line_start++;
-
-    if (*line_start && *line_start != '#') {
-      int entry_result =
-        run_manifest_entry(directory_path, line_start);
-
-      if (entry_result != 0)
-        return entry_result;
-    }
-
-    line_start = next_line_start;
+    if (entry_result != 0)
+      return entry_result;
   }
 
   return 0;
 }
 
 int
-area512_micropython_run_python_bytecode_file(const char *python_bytecode_path) {
+area512_micropython_run_python_bytecode_file(
+  const char *python_bytecode_path,
+  void *gc_heap,
+  size_t gc_heap_byte_size
+) {
+
   size_t python_bytecode_byte_length = 0;
 
   char *python_bytecode_bytes =
@@ -349,24 +329,9 @@ area512_micropython_run_python_bytecode_file(const char *python_bytecode_path) {
   if (!python_bytecode_bytes)
     return -1;
 
-  size_t micropython_gc_heap_byte_size = 0;
-
-  void *micropython_gc_heap =
-    area512_micropython_allocate_gc_heap(&micropython_gc_heap_byte_size);
-
-  if (!micropython_gc_heap) {
-    free(python_bytecode_bytes);
-
-    return -1;
-  }
-
   int micropython_stack_top;
 
-  mp_embed_init(
-    micropython_gc_heap,
-    micropython_gc_heap_byte_size,
-    &micropython_stack_top
-  );
+  mp_embed_init(gc_heap, gc_heap_byte_size, &micropython_stack_top);
 
   int run_result =
     exec_python_bytecode(
@@ -374,10 +339,10 @@ area512_micropython_run_python_bytecode_file(const char *python_bytecode_path) {
       python_bytecode_byte_length
     );
 
+  area512_micropython_record_gc_heap_used_byte_size();
   gc_sweep_all();
   mp_embed_deinit();
   area512_micropython_free_gc_heap_split_areas();
-  free(micropython_gc_heap);
   free(python_bytecode_bytes);
 
   return run_result;
@@ -386,7 +351,9 @@ area512_micropython_run_python_bytecode_file(const char *python_bytecode_path) {
 int
 area512_micropython_run_python_manifest(
   const char *directory_path,
-  const char *manifest_path
+  const char *manifest_path,
+  void *gc_heap,
+  size_t gc_heap_byte_size
 ) {
 
   size_t manifest_byte_length = 0;
@@ -400,31 +367,16 @@ area512_micropython_run_python_manifest(
   if (!manifest_text)
     return -1;
 
-  size_t micropython_gc_heap_byte_size = 0;
-
-  void *micropython_gc_heap =
-    area512_micropython_allocate_gc_heap(&micropython_gc_heap_byte_size);
-
-  if (!micropython_gc_heap) {
-    free(manifest_text);
-
-    return -1;
-  }
-
   int micropython_stack_top;
 
-  mp_embed_init(
-    micropython_gc_heap,
-    micropython_gc_heap_byte_size,
-    &micropython_stack_top
-  );
+  mp_embed_init(gc_heap, gc_heap_byte_size, &micropython_stack_top);
 
   int run_result = run_manifest_entries(directory_path, manifest_text);
 
+  area512_micropython_record_gc_heap_used_byte_size();
   gc_sweep_all();
   mp_embed_deinit();
   area512_micropython_free_gc_heap_split_areas();
-  free(micropython_gc_heap);
   free(manifest_text);
 
   return run_result;

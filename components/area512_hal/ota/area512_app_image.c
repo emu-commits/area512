@@ -312,13 +312,13 @@ area512_install_app_image(
     return -1;
   }
 
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (
     area512_resolve_data_path(
       path,
-      full_path,
-      sizeof(full_path)
+      resolved_path,
+      sizeof(resolved_path)
     ) != 0
   ) {
 
@@ -326,7 +326,7 @@ area512_install_app_image(
     return -1;
   }
 
-  FILE *file = fopen(full_path, "rb");
+  FILE *file = fopen(resolved_path, "rb");
 
   if (file == NULL) {
     snprintf(message, message_size, "Cannot open");

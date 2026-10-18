@@ -14,10 +14,8 @@ read_csi_final_byte(void) {
   return byte;
 }
 
-int
-area512_filer_read_key(void) {
-  int first_byte = area512_console_getch_block();
-
+static int
+read_filer_key_from_first_byte(int first_byte) {
   if (first_byte == 27) {
     int second_byte = area512_console_getch_timeout(40);
 
@@ -92,12 +90,25 @@ area512_filer_read_key(void) {
   }
 }
 
+int
+area512_filer_read_key(void) {
+  return read_filer_key_from_first_byte(area512_console_getch_block());
+}
+
+int
+read_filer_key_with_timeout(int timeout_ms) {
+  int first_byte = area512_console_getch_timeout(timeout_ms);
+
+  if (first_byte < 0)
+    return KEY_NONE;
+
+  return read_filer_key_from_first_byte(first_byte);
+}
+
 // Terminal mode types every letter, so only the arrow sequences are
 // translated; anything else comes back as a raw byte.
-int
-read_terminal_key(void) {
-  int first_byte = area512_console_getch_block();
-
+static int
+read_terminal_key_from_first_byte(int first_byte) {
   if (first_byte != 27)
     return first_byte;
 
@@ -116,6 +127,21 @@ read_terminal_key(void) {
   default:
     return 0;
   }
+}
+
+int
+read_terminal_key(void) {
+  return read_terminal_key_from_first_byte(area512_console_getch_block());
+}
+
+int
+read_terminal_key_with_timeout(int timeout_ms) {
+  int first_byte = area512_console_getch_timeout(timeout_ms);
+
+  if (first_byte < 0)
+    return KEY_NONE;
+
+  return read_terminal_key_from_first_byte(first_byte);
 }
 
 // area512_filer_read_key() translates letters into filer commands, which

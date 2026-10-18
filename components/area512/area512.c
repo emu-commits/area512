@@ -1,28 +1,17 @@
-// Firmware entry: brings up NVS, the mruby/c VM heap, and the main Ruby
-// task, then runs the VM. Called once from the ESP-IDF app_main.
+// Firmware entry: brings up NVS, the console and the Filer task, then
+// returns. Called once from the ESP-IDF app_main.
 #include "area512_hal.h"
-#include "picoruby.h"
+#include "filer_shell.h"
+#include "io-console.h"
+#include "ports/machine_port.h"
 #include "ports/tree_sitter_port.h"
 #include "sdkconfig.h"
-#include <inttypes.h>
+#include "watchdog.h"
 #include <nvs_flash.h>
 #if defined(CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG) ||                   \
   defined(CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
 #include "driver/usb_serial_jtag_vfs.h"
 #endif
-
-#include <mrubyc.h>
-
-#include <mrb/main_task.c>
-
-// Cardputer has no PSRAM. The mruby/c VM heap (120KB) is sized to leave
-// room for native allocations such as Sprites. See
-// CARDPUTER_MINIMAL_RUNTIME.md.
-#ifndef HEAP_SIZE
-#define HEAP_SIZE (1024 * 120)
-#endif
-
-static uint8_t s_heap_pool[HEAP_SIZE];
 
 void
 setup(void) {
@@ -51,16 +40,13 @@ area512_main(void) {
   setup();
   area512_restore_factory_boot_partition();
 
-  mrbc_init(s_heap_pool, HEAP_SIZE);
+  area512_start_console();
 
   area512_route_tree_sitter_allocations_to_mrubyc_pool();
   area512_register_tree_sitter_parse_budget();
 
-  mrbc_tcb *main_tcb = mrbc_create_task(main_task, 0);
-  mrbc_set_task_name(main_tcb, "main_task");
-  mrbc_vm *vm = &main_tcb->vm;
+  Watchdog_disable();
+  io_echo_eq(false);
 
-  picoruby_init_require(vm);
-
-  mrbc_run();
+  area512_start_filer();
 }

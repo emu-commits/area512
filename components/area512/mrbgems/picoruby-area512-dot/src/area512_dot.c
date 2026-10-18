@@ -4,10 +4,12 @@
 #include "core/dot_editor.h"
 #include "core/dot_image.h"
 
+#include "area512_dot.h"
 #include "area512_hal.h"
 #include <stdbool.h>
 #include "io-console.h"
 #include <mrubyc.h>
+#include <string.h>
 
 static DotImage *
 fetch_receiver_dot_image(mrbc_value *values) {
@@ -46,49 +48,45 @@ fetch_dot_image_argument(
   return *(DotImage **)values[index].instance->data;
 }
 
-static void
-raise_dot_image_status(mrbc_vm *virtual_machine, DotImageStatus status) {
-  const char *message;
-
+static const char *
+describe_dot_image_status(DotImageStatus status) {
   switch (status) {
   case DOT_IMAGE_STATUS_OPEN_FAILED:
-    message = "cannot open dot image";
-    break;
+    return "cannot open dot image";
 
   case DOT_IMAGE_STATUS_EMPTY_FILE:
-    message = "empty dot image";
-    break;
+    return "empty dot image";
 
   case DOT_IMAGE_STATUS_MAGIC_MISMATCH:
-    message = "not a dot image";
-    break;
+    return "not a dot image";
 
   case DOT_IMAGE_STATUS_VERSION_UNSUPPORTED:
-    message = "unsupported dot image version";
-    break;
+    return "unsupported dot image version";
 
   case DOT_IMAGE_STATUS_PALETTE_COLOR_COUNT_INVALID:
-    message = "invalid palette color count";
-    break;
+    return "invalid palette color count";
 
   case DOT_IMAGE_STATUS_CONTENT_BYTE_LENGTH_SHORT:
-    message = "dot image is truncated";
-    break;
+    return "dot image is truncated";
 
   case DOT_IMAGE_STATUS_OUT_OF_MEMORY:
-    message = "failed to allocate dot image";
-    break;
+    return "failed to allocate dot image";
 
   case DOT_IMAGE_STATUS_WRITE_FAILED:
-    message = "cannot write dot image";
-    break;
+    return "cannot write dot image";
 
   default:
-    message = "dot image error";
-    break;
+    return "dot image error";
   }
+}
 
-  mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), message);
+static void
+raise_dot_image_status(mrbc_vm *virtual_machine, DotImageStatus status) {
+  mrbc_raise(
+    virtual_machine,
+    MRBC_CLASS(RuntimeError),
+    describe_dot_image_status(status)
+  );
 }
 
 static void
@@ -281,15 +279,9 @@ c_dot_is_overlap(
   mrbc_set_bool(values, has_overlap);
 }
 
-static void
-c_dot_edit(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
-  if (argument_count < 1 || mrbc_type(values[1]) != MRBC_TT_STRING) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(ArgumentError), "expected a path");
-    return;
-  }
-
-  const char *path = (const char *)values[1].string->data;
-  int path_byte_length = values[1].string->size;
+int
+area512_edit_dot_image_file(const char *path, const char **exception_message) {
+  int path_byte_length = (int)strlen(path);
   DotImage *image = NULL;
 
   DotImageStatus status = load_dot_image_file(path, path_byte_length, &image);
@@ -300,8 +292,8 @@ c_dot_edit(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
   }
 
   if (status != DOT_IMAGE_STATUS_OK) {
-    raise_dot_image_status(virtual_machine, status);
-    return;
+    *exception_message = describe_dot_image_status(status);
+    return -1;
   }
 
   if (
@@ -310,9 +302,9 @@ c_dot_edit(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
   ) {
 
     free_dot_image(image);
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "Unsupported size");
+    *exception_message = "Unsupported size";
 
-    return;
+    return -1;
   }
 
   void *screen_sprite = area512_screen_new(DOT_EDITOR_FONT_SIZE);
@@ -320,13 +312,9 @@ c_dot_edit(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
   if (screen_sprite == NULL) {
     free_dot_image(image);
 
-    mrbc_raise(
-      virtual_machine,
-      MRBC_CLASS(RuntimeError),
-      "failed to allocate sprite"
-    );
+    *exception_message = "failed to allocate sprite";
 
-    return;
+    return -1;
   }
 
   DotEditor editor;
@@ -363,9 +351,36 @@ c_dot_edit(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
   free_dot_image(image);
 
   if (status != DOT_IMAGE_STATUS_OK) {
-    raise_dot_image_status(virtual_machine, status);
+    *exception_message = describe_dot_image_status(status);
+    return -1;
+  }
+
+  return 0;
+}
+
+static void
+c_dot_edit(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
+  if (argument_count < 1 || mrbc_type(values[1]) != MRBC_TT_STRING) {
+    mrbc_raise(virtual_machine, MRBC_CLASS(ArgumentError), "expected a path");
     return;
   }
+
+  const char *path = (const char *)values[1].string->data;
+  const char *exception_message = NULL;
+
+  if (area512_edit_dot_image_file(path, &exception_message) != 0) {
+    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), exception_message);
+    return;
+  }
+
+  mrbc_decref(values);
+  mrbc_set_nil(values);
+}
+
+static void
+c_dot_delete(mrbc_vm *virtual_machine, mrbc_value *values, int argument_count) {
+  free_dot_image(fetch_receiver_dot_image(values));
+  *(DotImage **)values->instance->data = NULL;
 
   mrbc_decref(values);
   mrbc_set_nil(values);
@@ -386,6 +401,7 @@ mrbc_area512_dot_init(mrbc_vm *virtual_machine) {
   mrbc_define_destructor(class_Dot, free_dot_image_on_gc);
   mrbc_define_method(virtual_machine, class_Dot, "load", c_dot_load);
   mrbc_define_method(virtual_machine, class_Dot, "edit", c_dot_edit);
+  mrbc_define_method(virtual_machine, class_Dot, "delete", c_dot_delete);
   mrbc_define_method(virtual_machine, class_Dot, "width", c_dot_width);
   mrbc_define_method(virtual_machine, class_Dot, "height", c_dot_height);
   mrbc_define_method(virtual_machine, class_Dot, "push", c_dot_push);

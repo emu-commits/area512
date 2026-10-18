@@ -51,9 +51,9 @@ confirm_installed_app_action(Filer *filer, const char *verb) {
   return read_yes_no_confirmation(filer, question);
 }
 
-// Interaction loop; returns an action code when Ruby work is needed. Single
-// exit so c_filer_run can wrap the whole loop in one foreground input
-// session.
+// Interaction loop; returns an action code when filer_shell.c work is needed.
+// Single exit so read_filer_action can wrap the whole loop in one foreground
+// input session.
 int
 run_filer_interaction(Filer *filer) {
   for (;;) {
@@ -71,7 +71,12 @@ run_filer_interaction(Filer *filer) {
 
     draw_all(filer);
 
-    int key = area512_filer_read_key();
+    int key = read_filer_key_with_timeout(REDRAW_INTERVAL_MS);
+
+    filer->has_key_wait_timed_out = (key == KEY_NONE);
+
+    if (filer->has_key_wait_timed_out)
+      continue;
 
     FileEntry *entry = fetch_selected_entry(filer);
 

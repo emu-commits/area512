@@ -8,8 +8,8 @@
 
 static int
 resolve_edit_path(
-  char *destination,
-  int destination_size,
+  char *resolved_path,
+  int resolved_path_size,
   const char *path,
   int path_byte_length
 ) {
@@ -29,24 +29,24 @@ resolve_edit_path(
 
   return area512_resolve_data_path(
            ruby_path,
-           destination,
-           (size_t)destination_size
+           resolved_path,
+           (size_t)resolved_path_size
          ) == 0;
 }
 
 int
 load_edit_file(const char *path, int path_byte_length, VimString *content) {
-  char path_buffer[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (!resolve_edit_path(
-        path_buffer,
-        sizeof(path_buffer),
+        resolved_path,
+        sizeof(resolved_path),
         path,
         path_byte_length
       ))
     return 0;
 
-  FILE *file = fopen(path_buffer, "rb");
+  FILE *file = fopen(resolved_path, "rb");
 
   if (file == NULL)
     return 0;
@@ -68,11 +68,11 @@ save_edit_file(Vim *core) {
   if (core->filepath.byte_length <= 0)
     return 0;
 
-  char path_buffer[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (!resolve_edit_path(
-        path_buffer,
-        sizeof(path_buffer),
+        resolved_path,
+        sizeof(resolved_path),
         core->filepath.bytes,
         core->filepath.byte_length
       ))
@@ -84,7 +84,7 @@ save_edit_file(Vim *core) {
 
   int saved = 0;
 
-  FILE *file = fopen(path_buffer, "wb");
+  FILE *file = fopen(resolved_path, "wb");
 
   if (file != NULL) {
     size_t written = 0;

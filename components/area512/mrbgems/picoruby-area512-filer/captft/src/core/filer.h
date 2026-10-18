@@ -1,6 +1,6 @@
 // Core filer declarations: layout constants, the filer state struct, and
-// the ACTION_* codes run() returns to the Ruby shell (must stay in sync with
-// the Ruby side). VM-independent: no mruby/c here.
+// the ACTION_* codes read_filer_action() returns to filer_shell.c.
+// VM-independent: no mruby/c here.
 #pragma once
 
 #include <stdint.h>
@@ -76,6 +76,9 @@
 #define TARGET_INVALID 1
 #define TARGET_MISSING 2
 
+#define REDRAW_INTERVAL_MS 16
+
+#define KEY_NONE 1000
 #define KEY_UP 1001
 #define KEY_DOWN 1002
 #define KEY_RIGHT 1003
@@ -105,7 +108,6 @@ typedef struct Terminal Terminal;
 typedef struct {
   int valid;
   int index, top, count;
-  int draws_window_frame;
   FileEntry entries[ROWS_VISIBLE];
   char current_directory[CURRENT_DIRECTORY_MAX];
   char message[MESSAGE_MAX];
@@ -113,10 +115,18 @@ typedef struct {
 } FilerDrawState;
 
 typedef struct {
+  int count;
+  const char *label[PANEL_MAX_METRICS];
+  int percent[PANEL_MAX_METRICS];
+} PanelInfo;
+
+typedef struct {
   void *row;
   void *screen;
   int index, top, count, full_redraw;
-  int draws_window_frame;
+  int has_key_wait_timed_out;
+  PanelInfo panel_info;
+  int is_window_open;
   int has_background_image;
   FilerDrawState drawn;
   char current_directory[CURRENT_DIRECTORY_MAX];
@@ -140,6 +150,7 @@ void add_entry_in_order(
   const FileEntry *entry
 );
 
+int has_path_suffix(const char *path, const char *suffix);
 int is_ruby_file_path(const char *file_path);
 int is_python_file_path(const char *file_path);
 int is_markdown_file_path(const char *file_path);
@@ -164,8 +175,10 @@ void fit_string(
 );
 
 int area512_filer_read_key(void);
+int read_filer_key_with_timeout(int timeout_ms);
 int read_raw_text_key(void);
 int read_terminal_key(void);
+int read_terminal_key_with_timeout(int timeout_ms);
 void area512_filer_setup_ui(Filer *filer);
 void area512_filer_teardown_ui(Filer *filer);
 
@@ -180,5 +193,9 @@ void build_delete_question(
 int read_text_input(Filer *filer, const char *label);
 int read_yes_no_confirmation(Filer *filer, const char *question);
 int run_filer_interaction(Filer *filer);
+int read_filer_action(Filer *filer);
 void draw_all(Filer *filer);
+void draw_current_screen(void *context);
+void draw_window_box(void *sprite, int left, int top, int width, int height);
 void area512_filer_open_window(Filer *filer);
+void area512_filer_set_gfx_window(void);

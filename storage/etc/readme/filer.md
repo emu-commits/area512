@@ -147,7 +147,7 @@ Command arguments are separated by spaces. Quoting and escaping spaces in names 
 
 - `irb`: start the Ruby REPL
 - `python-repl`: start the Python REPL
-- `top`: show battery, VM memory, RAM, and stack percentages
+- `top`: show battery, arena, RAM, and stack percentages
 - `reboot`: restart the device
 
 ## Other

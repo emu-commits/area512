@@ -21,7 +21,11 @@ has_parent_reference(const char *path) {
 }
 
 int
-area512_resolve_data_path(const char *path, char *buffer, size_t buffer_size) {
+area512_resolve_data_path(
+  const char *path,
+  char *resolved_path,
+  size_t resolved_path_size
+) {
   while (*path == '/')
     path++;
 
@@ -29,20 +33,25 @@ area512_resolve_data_path(const char *path, char *buffer, size_t buffer_size) {
   if (has_parent_reference(path))
     return -1;
 
-  size_t root_length = strlen(AREA512_DATA_ROOT);
+  size_t area512_root_path_length = strlen(AREA512_ROOT_PATH);
   size_t path_length = strlen(path);
-  size_t full_length = root_length + (path_length > 0 ? 1 + path_length : 0);
+  size_t resolved_path_length =
+    area512_root_path_length + (path_length > 0 ? 1 + path_length : 0);
 
-  if (full_length + 1 > buffer_size)
+  if (resolved_path_length + 1 > resolved_path_size)
     return -1;
 
-  memcpy(buffer, AREA512_DATA_ROOT, root_length);
+  memcpy(resolved_path, AREA512_ROOT_PATH, area512_root_path_length);
 
   if (path_length > 0) {
-    buffer[root_length] = '/';
-    memcpy(buffer + root_length + 1, path, path_length + 1);
+    resolved_path[area512_root_path_length] = '/';
+    memcpy(
+      resolved_path + area512_root_path_length + 1,
+      path,
+      path_length + 1
+    );
   } else {
-    buffer[root_length] = '\0';
+    resolved_path[area512_root_path_length] = '\0';
   }
 
   return 0;

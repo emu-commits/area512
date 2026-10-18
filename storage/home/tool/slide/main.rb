@@ -1,6 +1,7 @@
 require 'area512-sprite'
 require 'area512-widget'
 require 'area512-sdfat'
+require 'machine'
 require 'io/console'
 
 class SlideShow

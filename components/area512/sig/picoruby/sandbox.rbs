@@ -79,10 +79,10 @@ class Sandbox
   # Terminate the task and release kept code and compiler resources
   def cleanup: () -> nil
 
-  # Execute an .mrb file keeping its bytecode resident until release
-  def area512_exec_mrb_file_keep: (String path) -> bool
+  # Prepare the task to run an .mrb file, keeping its bytecode resident until release
+  def area512_prepare_task_for_run: (String path) -> bool
 
-  # Release all bytecode kept by area512_exec_mrb_file_keep
+  # Release all bytecode kept by area512_prepare_task_for_run
   def area512_release_kept_code: () -> nil
 
   # Release the mrc_irep produced by the last compile

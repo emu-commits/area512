@@ -8,23 +8,16 @@
 #include "py/repl.h"
 #include "py/runtime.h"
 
-#include <stdlib.h>
 #include <string.h>
 
-static void *s_repl_gc_heap;
+void
+area512_micropython_open_repl_runtime(
+  void *micropython_stack_top,
+  void *gc_heap,
+  size_t gc_heap_byte_size
+) {
 
-int
-area512_micropython_open_repl_runtime(void *micropython_stack_top) {
-  size_t gc_heap_byte_size = 0;
-
-  s_repl_gc_heap = area512_micropython_allocate_gc_heap(&gc_heap_byte_size);
-
-  if (!s_repl_gc_heap)
-    return -1;
-
-  mp_embed_init(s_repl_gc_heap, gc_heap_byte_size, micropython_stack_top);
-
-  return 0;
+  mp_embed_init(gc_heap, gc_heap_byte_size, micropython_stack_top);
 }
 
 void
@@ -63,11 +56,8 @@ area512_micropython_repl_source_is_incomplete(const char *python_source) {
 
 void
 area512_micropython_close_repl_runtime(void) {
+  area512_micropython_record_gc_heap_used_byte_size();
   gc_sweep_all();
   mp_embed_deinit();
   area512_micropython_free_gc_heap_split_areas();
-
-  free(s_repl_gc_heap);
-
-  s_repl_gc_heap = NULL;
 }

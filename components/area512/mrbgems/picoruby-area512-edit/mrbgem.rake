@@ -3,7 +3,7 @@ MRuby::Gem::Specification.new('picoruby-area512-edit') do |spec|
   spec.author  = 'hamachan'
   spec.summary = 'Area512 (Cardputer) native C vim-like editor and Markdown viewer'
 
-  # main_task.rb / filer keep using `require "vim"` and `Vim.new(path).start`.
+  # environment_task.rb keeps using `require "vim"`.
   spec.require_name = 'vim'
 
   spec.add_dependency 'mruby-compiler2'

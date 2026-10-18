@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define LABEL_OFFSET_COLUMNS 2
+
 static int
 scrollbar_color(Filer *filer, int row) {
   int total = filer->count;
@@ -62,30 +64,33 @@ draw_entry(Filer *filer, int y, int index, int row, const PanelInfo *info) {
     char label_text[NAME_MAX + 2];
     format_file_label(entry, label_text, sizeof label_text);
 
-    char line[LINE_MAX];
-
-    snprintf(
-      line,
-      sizeof line,
-      "%c %s",
-      selected ? '>' : ' ', label_text
-    );
-
     int list_columns =
       panel_covers_row(row) ? PANEL_COLUMNS : CONTENT_COLUMNS;
 
-    char fitted[LINE_MAX];
-    fit_string(fitted, sizeof fitted, line, list_columns);
+    char fitted_label[LINE_MAX];
+    fit_string(
+      fitted_label,
+      sizeof fitted_label,
+      label_text,
+      list_columns - LABEL_OFFSET_COLUMNS
+    );
+
+    uint32_t text_color =
+      selected ? area512_theme_selected_color() : area512_theme_text_color();
 
     area512_sprite_set_font_size(filer->row, 12);
 
-    area512_sprite_text(
-      filer->row,
-      CONTENT_X,
-      0,
-      fitted,
-      selected ? area512_theme_selected_color() : area512_theme_text_color()
-    );
+    if (selected)
+      area512_draw_filer_cursor_animation(
+        filer->row,
+        CONTENT_X,
+        0,
+        text_color
+      );
+
+    int label_x = CONTENT_X + LABEL_OFFSET_COLUMNS * FILER_CHAR_WIDTH;
+
+    area512_sprite_text(filer->row, label_x, 0, fitted_label, text_color);
 
     area512_sprite_set_font_size(filer->row, FILER_FONT_SIZE);
   }

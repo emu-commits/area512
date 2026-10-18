@@ -37,7 +37,7 @@ class Writer
 
   def run
     init_app
-    Display.fill_screen(C_APP)
+    Display.fill_screen(Widget.theme_background)
     @sp = BandedSprite.new(12)
     begin
       SD.mount
@@ -48,7 +48,7 @@ class Writer
     ensure
       SD.unmount
       @sp.delete if @sp
-      Display.fill_screen(C_APP)
+      Display.fill_screen(Widget.theme_background)
     end
   end
 end

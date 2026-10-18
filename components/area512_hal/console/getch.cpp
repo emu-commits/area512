@@ -33,3 +33,9 @@ extern "C" int
 area512_console_getch_timeout(int timeout_ms) {
   return poll_for_character(timeout_ms);
 }
+
+extern "C" void
+area512_console_wait_key_if_output(void) {
+  if (area512_console_had_output())
+    area512_console_getch_block();
+}

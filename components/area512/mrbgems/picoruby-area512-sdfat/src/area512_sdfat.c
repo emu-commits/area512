@@ -18,13 +18,20 @@ static bool
 resolve_path_argument(
   mrbc_vm *virtual_machine,
   mrbc_value v[],
-  char *buffer,
-  size_t buffer_size
+  char *resolved_path,
+  size_t resolved_path_size
 ) {
 
   const char *path = (const char *)GET_STRING_ARG(1);
 
-  if (area512_resolve_data_path(path, buffer, buffer_size) != 0) {
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      resolved_path_size
+    ) != 0
+  ) {
+
     mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "invalid path");
     return false;
   }
@@ -61,26 +68,38 @@ c_sdfat__is_exist(
   int argument_count
 ) {
   const char *path = (const char *)GET_STRING_ARG(1);
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (area512_resolve_data_path(path, full_path, sizeof full_path) != 0) {
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      sizeof resolved_path
+    ) != 0
+  ) {
+
     SET_FALSE_RETURN();
     return;
   }
 
   struct stat stat_buffer;
 
-  SET_BOOL_RETURN(stat(full_path, &stat_buffer) == 0);
+  SET_BOOL_RETURN(stat(resolved_path, &stat_buffer) == 0);
 }
 
 static void
 c_sdfat__mkdir(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (!resolve_path_argument(virtual_machine, v, full_path, sizeof full_path))
+  if (!resolve_path_argument(
+        virtual_machine,
+        v,
+        resolved_path,
+        sizeof resolved_path
+      ))
     return;
 
-  if (mkdir(full_path, 0777) != 0 && errno != EEXIST) {
+  if (mkdir(resolved_path, 0777) != 0 && errno != EEXIST) {
     mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), strerror(errno));
     return;
   }
@@ -90,12 +109,17 @@ c_sdfat__mkdir(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
 
 static void
 c_sdfat__read(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (!resolve_path_argument(virtual_machine, v, full_path, sizeof full_path))
+  if (!resolve_path_argument(
+        virtual_machine,
+        v,
+        resolved_path,
+        sizeof resolved_path
+      ))
     return;
 
-  FILE *file_pointer = fopen(full_path, "rb");
+  FILE *file_pointer = fopen(resolved_path, "rb");
 
   if (file_pointer == NULL) {
     mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), strerror(errno));
@@ -104,7 +128,7 @@ c_sdfat__read(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
 
   struct stat stat_buffer;
 
-  if (stat(full_path, &stat_buffer) != 0) {
+  if (stat(resolved_path, &stat_buffer) != 0) {
     fclose(file_pointer);
     mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), strerror(errno));
 
@@ -159,14 +183,19 @@ c_sdfat__read(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
 static void
 c_sdfat__write(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
   mrbc_value content = v[2];
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (!resolve_path_argument(virtual_machine, v, full_path, sizeof full_path))
+  if (!resolve_path_argument(
+        virtual_machine,
+        v,
+        resolved_path,
+        sizeof resolved_path
+      ))
     return;
 
   char temporary_path[AREA512_PATH_MAX + sizeof(".tmp")];
 
-  strcpy(temporary_path, full_path);
+  strcpy(temporary_path, resolved_path);
   strcat(temporary_path, ".tmp");
 
   FILE *file_pointer = fopen(temporary_path, "wb");
@@ -190,8 +219,12 @@ c_sdfat__write(mrbc_vm *virtual_machine, mrbc_value v[], int argument_count) {
 
   // FAT's rename can't replace an existing file, so remove the target first;
   // the fully written .tmp file survives a power cut in between.
-  if (rename(temporary_path, full_path) != 0) {
-    if (remove(full_path) != 0 || rename(temporary_path, full_path) != 0) {
+  if (rename(temporary_path, resolved_path) != 0) {
+    if (
+      remove(resolved_path) != 0 ||
+      rename(temporary_path, resolved_path) != 0
+    ) {
+
       remove(temporary_path);
       mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), strerror(errno));
 

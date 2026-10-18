@@ -1,11 +1,13 @@
 #if defined(PICORB_VM_MRUBYC)
 
+#include "area512_arena.h"
 #include "area512_hal.h"
 #include "core/terminal/terminal.h"
 
 #include <stdio.h>
 
 #define METRIC_BAR_BYTE_COUNT 20
+#define FREE_TEXT_BYTE_SIZE 8
 
 static void
 build_metric_bar_text(int metric_percent, char *bar_text) {
@@ -36,7 +38,8 @@ static void
 append_metric_line(
   Filer *filer,
   const char *metric_label,
-  int metric_percent
+  int metric_percent,
+  const char *free_text
 ) {
 
   char bar_text[METRIC_BAR_BYTE_COUNT + 1];
@@ -53,21 +56,50 @@ append_metric_line(
   snprintf(
     line_text,
     sizeof line_text,
-    "%-3s [%s] %4s",
+    "%-3s [%s] %4s  %4s",
     metric_label,
     bar_text,
-    value_text
+    value_text,
+    free_text
   );
 
   append_output_text(filer->terminal, line_text);
 }
 
+static void
+format_free_kilobyte_text(int free_byte_size, char *free_text) {
+  snprintf(free_text, FREE_TEXT_BYTE_SIZE, "%dK", free_byte_size / 1024);
+}
+
 void
 show_metrics(Filer *filer) {
-  append_metric_line(filer, "BAT", area512_metrics_battery_percent());
-  append_metric_line(filer, "VM", area512_metrics_vm_used_pct());
-  append_metric_line(filer, "RAM", area512_metrics_dram_used_pct());
-  append_metric_line(filer, "STK", area512_metrics_stack_used_pct());
+  char free_text[FREE_TEXT_BYTE_SIZE];
+
+  append_metric_line(filer, "BAT", area512_metrics_battery_percent(), "");
+
+  format_free_kilobyte_text(area512_metrics_arena_free_byte_size(), free_text);
+  append_metric_line(
+    filer,
+    "ARN",
+    area512_metrics_arena_used_pct(),
+    free_text
+  );
+
+  format_free_kilobyte_text(area512_metrics_dram_free_byte_size(), free_text);
+  append_metric_line(
+    filer,
+    "RAM",
+    area512_metrics_dram_used_pct(),
+    free_text
+  );
+
+  format_free_kilobyte_text(area512_metrics_stack_free_byte_size(), free_text);
+  append_metric_line(
+    filer,
+    "STK",
+    area512_metrics_stack_used_pct(),
+    free_text
+  );
 }
 
 #endif

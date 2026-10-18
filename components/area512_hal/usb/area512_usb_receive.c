@@ -40,7 +40,7 @@
 typedef struct {
   FILE *file;
   char path[AREA512_PATH_MAX];
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
   long byte_count;
   long received_byte_count;
   uint32_t crc32;
@@ -218,8 +218,8 @@ receive_chunk(ReceivingFile *receiving_file, long chunk_byte_count) {
 }
 
 static int
-compute_file_crc32(const char *full_path, uint32_t *crc32) {
-  FILE *file = fopen(full_path, "rb");
+compute_file_crc32(const char *resolved_path, uint32_t *crc32) {
+  FILE *file = fopen(resolved_path, "rb");
 
   if (file == NULL) {
     return -1;
@@ -260,7 +260,7 @@ compute_file_crc32(const char *full_path, uint32_t *crc32) {
 static void
 close_and_delete_receiving_file(ReceivingFile *receiving_file) {
   fclose(receiving_file->file);
-  unlink(receiving_file->full_path);
+  unlink(receiving_file->resolved_path);
 
   receiving_file->file = NULL;
 }
@@ -308,10 +308,10 @@ start_receiving_file(
   if (
     area512_resolve_data_path(
       receiving_file->path,
-      receiving_file->full_path,
-      sizeof(receiving_file->full_path)
+      receiving_file->resolved_path,
+      sizeof(receiving_file->resolved_path)
     ) != 0 ||
-    strcmp(receiving_file->full_path, AREA512_DATA_ROOT) == 0
+    strcmp(receiving_file->resolved_path, AREA512_ROOT_PATH) == 0
   ) {
 
     write_console_line("NG bad path");
@@ -321,7 +321,7 @@ start_receiving_file(
   }
 
   if (
-    !area512_ensure_parent_directories(receiving_file->full_path)
+    !area512_ensure_parent_directories(receiving_file->resolved_path)
   ) {
 
     write_console_line("NG mkdir failed");
@@ -330,7 +330,7 @@ start_receiving_file(
     return;
   }
 
-  receiving_file->file = fopen(receiving_file->full_path, "wb");
+  receiving_file->file = fopen(receiving_file->resolved_path, "wb");
 
   if (receiving_file->file == NULL) {
     write_console_line("NG open failed");
@@ -361,7 +361,7 @@ finish_receiving_file(ReceivingFile *receiving_file) {
   receiving_file->file = NULL;
 
   if (!closed) {
-    unlink(receiving_file->full_path);
+    unlink(receiving_file->resolved_path);
 
     write_console_line("NG write failed");
     write_reply("NG write failed");
@@ -371,13 +371,13 @@ finish_receiving_file(ReceivingFile *receiving_file) {
 
   if (
     compute_file_crc32(
-      receiving_file->full_path,
+      receiving_file->resolved_path,
       &computed_crc32
     ) != 0 ||
     computed_crc32 != receiving_file->crc32
   ) {
 
-    unlink(receiving_file->full_path);
+    unlink(receiving_file->resolved_path);
 
     write_console_line("NG crc mismatch");
     write_reply("NG crc mismatch");
@@ -391,17 +391,17 @@ finish_receiving_file(ReceivingFile *receiving_file) {
 
 static void
 make_directory(const char *path) {
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   write_console_line(path);
 
   if (
     area512_resolve_data_path(
       path,
-      full_path,
-      sizeof(full_path)
+      resolved_path,
+      sizeof(resolved_path)
     ) != 0 ||
-    strcmp(full_path, AREA512_DATA_ROOT) == 0
+    strcmp(resolved_path, AREA512_ROOT_PATH) == 0
   ) {
 
     write_console_line("NG bad path");
@@ -411,8 +411,8 @@ make_directory(const char *path) {
   }
 
   if (
-    !area512_ensure_parent_directories(full_path) ||
-    !area512_ensure_directory(full_path)
+    !area512_ensure_parent_directories(resolved_path) ||
+    !area512_ensure_directory(resolved_path)
   ) {
 
     write_console_line("NG mkdir failed");

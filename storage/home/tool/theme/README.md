@@ -2,7 +2,8 @@
 
 Theme color editor for Area512/Cardputer. Edits `/etc/theme`.
 
-Rows: `background`, `text`, `emphasis`, `border`, `selected`, `box`, `image`.
+Rows: `background`, `text`, `emphasis`, `border`, `selected`, `box`, `image`,
+`crt`.
 
 ## Controls
 
@@ -10,8 +11,8 @@ Rows: `background`, `text`, `emphasis`, `border`, `selected`, `box`, `image`.
 - `h` / `l`: select the R / G / B channel
 - `+` / `-`: channel value +1 / -1
 - `]` / `[`: channel value +16 / -16
-- Enter: type a color as `0xRRGGBB`, or pick a background image on the
-  `image` row
+- Enter: type a color as `0xRRGGBB`, pick a background image on the
+  `image` row, or switch the CRT effect on / off on the `crt` row
 - Tab: preview the theme (Tab or Esc returns)
 - `s`: save to `/etc/theme`
 - Esc: quit (asks to discard unsaved changes)

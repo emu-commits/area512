@@ -4,6 +4,8 @@
 
 #include "core/filer.h"
 
+#include <sys/stat.h>
+
 #define TERMINAL_OUTPUT_ROW_CAPACITY 10
 #define TERMINAL_HISTORY_LINE_CAPACITY 5
 #define TERMINAL_CONTENT_LEFT_X 2
@@ -35,6 +37,7 @@ int run_terminal_session(Filer *filer);
 void close_terminal_session(Filer *filer);
 
 void draw_terminal(Filer *filer);
+void draw_terminal_prompt_row(Filer *filer);
 
 void append_output_text(Terminal *terminal, const char *text);
 void clear_output_lines(Terminal *terminal);
@@ -59,6 +62,8 @@ void expand_tilde(
   char *expanded_path,
   int expanded_path_capacity
 );
+
+int stat_data_path(const char *absolute_path, struct stat *stat_buffer);
 
 int resolve_target_path(
   const char *current_directory,

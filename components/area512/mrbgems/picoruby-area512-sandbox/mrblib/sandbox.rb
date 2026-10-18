@@ -20,10 +20,10 @@ class Sandbox
       next if line.empty? || line.start_with?("#")
 
       path = line.start_with?("/") ? line : "#{directory}/#{line}"
-      started = area512_exec_mrb_file_keep(path)
+      prepared = area512_prepare_task_for_run(path)
 
-      unless started
-        raise RuntimeError, "#{path}: area512_exec_mrb_file_keep failed"
+      unless prepared
+        raise RuntimeError, "#{path}: area512_prepare_task_for_run failed"
       end
 
       if join

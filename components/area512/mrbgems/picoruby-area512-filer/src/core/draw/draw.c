@@ -14,17 +14,18 @@ draw_all(Filer *filer) {
 
   adjust_scroll(filer);
 
-  PanelInfo panel_info;
-  build_panel_info(&panel_info);
+  if (!filer->has_key_wait_timed_out)
+    build_panel_info(&filer->panel_info);
 
-  filer->panel_top_row = (filer->rows_visible - (panel_info.count + 1)) / 2;
+  filer->panel_top_row =
+    (filer->rows_visible - (filer->panel_info.count + 1)) / 2;
 
   if (filer->panel_top_row < 0)
     filer->panel_top_row = 0;
 
   uint8_t changed_rows[filer->height];
 
-  find_changed_rows(filer, &panel_info, changed_rows);
+  find_changed_rows(filer, changed_rows);
 
   int draw_background = 1;
   int background_failed = 0;
@@ -99,7 +100,7 @@ draw_all(Filer *filer) {
         filer->list_top + row * ROW_HEIGHT,
         filer->top + row,
         row,
-        &panel_info
+        &filer->panel_info
       );
 
       row++;
@@ -109,6 +110,26 @@ draw_all(Filer *filer) {
     draw_secondary_action_bar(filer);
     draw_frame(filer);
     draw_header(filer);
+
+    if (area512_is_filer_window_open_animation_running())
+      area512_draw_filer_window_open_animation(
+        filer->screen,
+        0,
+        0,
+        filer->width - 1,
+        filer->height
+      );
+    else if (filer->terminal || filer->is_window_open)
+      draw_window_box(filer->screen, 0, 0, filer->width - 1, filer->height);
+
+    if (area512_is_filer_window_close_animation_running())
+      area512_draw_filer_window_close_animation(
+        filer->screen,
+        0,
+        0,
+        filer->width - 1,
+        filer->height
+      );
 
     area512_screen_push_region(filer->screen);
 
@@ -120,7 +141,7 @@ draw_all(Filer *filer) {
   filer->screen = 0;
   filer->full_redraw = 0;
 
-  save_draw_state(filer, &panel_info);
+  save_draw_state(filer);
 
   filer->drawn.valid = !background_failed;
 }

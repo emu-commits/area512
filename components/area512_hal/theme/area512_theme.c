@@ -5,6 +5,7 @@
 
 #define THEME_PATH "etc/theme"
 #define THEME_LINE_BYTES 64
+#define WHITE_COLOR 0xFFFFFF
 
 typedef struct {
   char background_image[THEME_LINE_BYTES];
@@ -14,6 +15,7 @@ typedef struct {
   uint32_t border_color;
   uint32_t selected_color;
   uint32_t box_color;
+  bool is_crt_enabled;
 } Theme;
 
 static Theme s_theme = {
@@ -23,6 +25,7 @@ static Theme s_theme = {
   .border_color = 0xF5972D,
   .selected_color = 0xFFD966,
   .box_color = 0x241604,
+  .is_crt_enabled = false,
 };
 
 static uint32_t
@@ -32,15 +35,34 @@ luminance(uint32_t color) {
 
 static uint32_t
 blend_color_channel(
-  int background_channel,
-  int text_channel,
-  int text_color_percent
+  int under_channel,
+  int over_channel,
+  int over_color_percent
 ) {
 
   return (uint32_t)(
-    background_channel +
-    (text_channel - background_channel) * text_color_percent / 100
+    under_channel + (over_channel - under_channel) * over_color_percent / 100
   );
+}
+
+static uint32_t
+blend_color(uint32_t under_color, uint32_t over_color, int over_color_percent) {
+  return
+    (blend_color_channel(
+      (under_color >> 16) & 0xFF,
+      (over_color >> 16) & 0xFF,
+      over_color_percent
+    ) << 16) |
+    (blend_color_channel(
+      (under_color >> 8) & 0xFF,
+      (over_color >> 8) & 0xFF,
+      over_color_percent
+    ) << 8) |
+    blend_color_channel(
+      under_color & 0xFF,
+      over_color & 0xFF,
+      over_color_percent
+    );
 }
 
 static int
@@ -130,6 +152,14 @@ assign_theme_from_line(char *line) {
     return;
   }
 
+  if (strcmp(line, "crt") == 0) {
+    if (strcmp(equal_sign + 1, "on") == 0)
+      s_theme.is_crt_enabled = true;
+    else if (strcmp(equal_sign + 1, "off") == 0)
+      s_theme.is_crt_enabled = false;
+    return;
+  }
+
   uint32_t color;
 
   if (parse_hex_color(equal_sign + 1, &color))
@@ -138,18 +168,18 @@ assign_theme_from_line(char *line) {
 
 void
 area512_theme_load(void) {
-  char path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
   if (
     area512_resolve_data_path(
       THEME_PATH,
-      path,
-      sizeof(path)
+      resolved_path,
+      sizeof(resolved_path)
     ) < 0
   )
     return;
 
-  FILE *file = fopen(path, "r");
+  FILE *file = fopen(resolved_path, "r");
 
   if (file == NULL)
     return;
@@ -197,27 +227,32 @@ area512_theme_box_color(void) {
   return s_theme.box_color;
 }
 
+bool
+area512_theme_is_crt_enabled(void) {
+  return s_theme.is_crt_enabled;
+}
+
 uint32_t
 area512_theme_blend_text_color_over_background(int text_color_percent) {
-  uint32_t background_color = s_theme.background_color;
-  uint32_t text_color = s_theme.text_color;
+  return blend_color(
+    s_theme.background_color,
+    s_theme.text_color,
+    text_color_percent
+  );
+}
 
-  return
-    (blend_color_channel(
-      (background_color >> 16) & 0xFF,
-      (text_color >> 16) & 0xFF,
-      text_color_percent
-    ) << 16) |
-    (blend_color_channel(
-      (background_color >> 8) & 0xFF,
-      (text_color >> 8) & 0xFF,
-      text_color_percent
-    ) << 8) |
-    blend_color_channel(
-      background_color & 0xFF,
-      text_color & 0xFF,
-      text_color_percent
-    );
+uint32_t
+area512_theme_blend_selected_color_over_background(int selected_color_percent) {
+  return blend_color(
+    s_theme.background_color,
+    s_theme.selected_color,
+    selected_color_percent
+  );
+}
+
+uint32_t
+area512_theme_blend_white_over_emphasis_color(int white_percent) {
+  return blend_color(s_theme.emphasis_color, WHITE_COLOR, white_percent);
 }
 
 // Bitmaps are authored with the set bits as the brighter side, so a light

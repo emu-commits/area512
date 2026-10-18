@@ -2,6 +2,7 @@
 
 #if defined(PICORB_VM_MRUBYC)
 
+#include "area512_compile.h"
 #include "area512_hal.h"
 
 #include <errno.h>
@@ -15,18 +16,30 @@
 #include <mrubyc.h>
 
 static uint8_t *
-read_whole_file(mrbc_vm *virtual_machine, const char *path, size_t *size) {
-  char full_path[AREA512_PATH_MAX];
+read_whole_file(
+  const char *path,
+  size_t *size,
+  const char **exception_message
+) {
 
-  if (area512_resolve_data_path(path, full_path, sizeof full_path) != 0) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "invalid path");
+  char resolved_path[AREA512_PATH_MAX];
+
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      sizeof resolved_path
+    ) != 0
+  ) {
+
+    *exception_message = "invalid path";
     return NULL;
   }
 
-  FILE *file = fopen(full_path, "rb");
+  FILE *file = fopen(resolved_path, "rb");
 
   if (!file) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), strerror(errno));
+    *exception_message = strerror(errno);
     return NULL;
   }
 
@@ -38,7 +51,7 @@ read_whole_file(mrbc_vm *virtual_machine, const char *path, size_t *size) {
 
   if (file_size < 0 || fseek(file, 0, SEEK_SET) != 0) {
     fclose(file);
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), strerror(errno));
+    *exception_message = strerror(errno);
 
     return NULL;
   }
@@ -46,7 +59,7 @@ read_whole_file(mrbc_vm *virtual_machine, const char *path, size_t *size) {
   uint8_t *buffer = (uint8_t *)mrbc_raw_alloc((unsigned int)file_size + 1);
   if (!buffer) {
     fclose(file);
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "out of memory");
+    *exception_message = "out of memory";
 
     return NULL;
   }
@@ -57,7 +70,7 @@ read_whole_file(mrbc_vm *virtual_machine, const char *path, size_t *size) {
 
   if (read_size != (size_t)file_size) {
     mrbc_raw_free(buffer);
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "read failed");
+    *exception_message = "read failed";
 
     return NULL;
   }
@@ -70,79 +83,71 @@ read_whole_file(mrbc_vm *virtual_machine, const char *path, size_t *size) {
 
 static bool
 write_whole_file(
-  mrbc_vm *virtual_machine,
   const char *path,
   const uint8_t *data,
-  size_t size
+  size_t size,
+  const char **exception_message
 ) {
 
-  char full_path[AREA512_PATH_MAX];
+  char resolved_path[AREA512_PATH_MAX];
 
-  if (area512_resolve_data_path(path, full_path, sizeof full_path) != 0) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "invalid path");
+  if (
+    area512_resolve_data_path(
+      path,
+      resolved_path,
+      sizeof resolved_path
+    ) != 0
+  ) {
+
+    *exception_message = "invalid path";
     return false;
   }
 
-  FILE *file = fopen(full_path, "wb");
+  FILE *file = fopen(resolved_path, "wb");
 
   if (!file) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), strerror(errno));
+    *exception_message = strerror(errno);
     return false;
   }
 
   size_t written = fwrite(data, 1, size, file);
 
   if (fclose(file) != 0 || written != size) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "write failed");
+    *exception_message = "write failed";
     return false;
   }
 
   return true;
 }
 
-static void
-c_area512_compile_file(
-  mrbc_vm *virtual_machine,
-  mrbc_value *v,
-  int argument_count
+int
+area512_compile_ruby_source_file(
+  const char *source_path,
+  const char *bytecode_path,
+  const char **exception_message
 ) {
-
-  (void)argument_count;
-
-  if (v[1].tt != MRBC_TT_STRING || v[2].tt != MRBC_TT_STRING) {
-    mrbc_raise(
-      virtual_machine,
-      MRBC_CLASS(TypeError),
-      "expected String source, destination"
-    );
-
-    return;
-  }
-
-  const char *source_path = (const char *)v[1].string->data;
-  const char *destination_path = (const char *)v[2].string->data;
 
   size_t source_length = 0;
 
   uint8_t *source =
-    read_whole_file(virtual_machine, source_path, &source_length);
+    read_whole_file(source_path, &source_length, exception_message);
 
   if (!source)
-    return;
+    return -1;
 
   if (source_length >= 4 && memcmp(source, "RITE", 4) == 0) {
     mrbc_raw_free(source);
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "already compiled");
+    *exception_message = "already compiled";
 
-    return;
+    return -1;
   }
 
   mrc_ccontext *context = mrc_ccontext_new(NULL);
   if (!context) {
     mrbc_raw_free(source);
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "out of memory");
+    *exception_message = "out of memory";
 
-    return;
+    return -1;
   }
 
   mrc_ccontext_filename(context, source_path);
@@ -180,10 +185,10 @@ c_area512_compile_file(
 
     if (dump_result == MRC_DUMP_OK)
       wrote = write_whole_file(
-        virtual_machine,
-        destination_path,
+        bytecode_path,
         binary,
-        binary_size
+        binary_size,
+        exception_message
       );
   }
 
@@ -199,19 +204,58 @@ c_area512_compile_file(
   mrbc_raw_free(source);
 
   if (!irep) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "compile failed");
+    *exception_message = "compile failed";
 
-    return;
+    return -1;
   }
 
   if (dump_result != MRC_DUMP_OK) {
-    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), "dump failed");
+    *exception_message = "dump failed";
+
+    return -1;
+  }
+
+  if (!wrote)
+    return -1;
+
+  return 0;
+}
+
+static void
+c_area512_compile_file(
+  mrbc_vm *virtual_machine,
+  mrbc_value *v,
+  int argument_count
+) {
+
+  (void)argument_count;
+
+  if (v[1].tt != MRBC_TT_STRING || v[2].tt != MRBC_TT_STRING) {
+    mrbc_raise(
+      virtual_machine,
+      MRBC_CLASS(TypeError),
+      "expected String source, destination"
+    );
 
     return;
   }
 
-  if (!wrote)
+  const char *source_path = (const char *)v[1].string->data;
+  const char *destination_path = (const char *)v[2].string->data;
+  const char *exception_message = NULL;
+
+  if (
+    area512_compile_ruby_source_file(
+      source_path,
+      destination_path,
+      &exception_message
+    ) != 0
+  ) {
+
+    mrbc_raise(virtual_machine, MRBC_CLASS(RuntimeError), exception_message);
+
     return;
+  }
 
   SET_TRUE_RETURN();
 }

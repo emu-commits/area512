@@ -2,30 +2,6 @@
 
 #include <string.h>
 
-#define WINDOW_LEFT ((SCREEN_WIDTH - AREA512_WINDOW_WIDTH) / 2)
-#define WINDOW_TOP ((FRAME_TOP + BAR1_Y - AREA512_WINDOW_HEIGHT) / 2)
-
-static void
-draw_window_frame(Filer *filer) {
-  area512_sprite_fill_rect(
-    filer->screen,
-    WINDOW_LEFT - 1,
-    WINDOW_TOP - 1,
-    AREA512_WINDOW_WIDTH + 2,
-    AREA512_WINDOW_HEIGHT + 2,
-    area512_theme_border_color()
-  );
-
-  area512_sprite_fill_rect(
-    filer->screen,
-    WINDOW_LEFT,
-    WINDOW_TOP,
-    AREA512_WINDOW_WIDTH,
-    AREA512_WINDOW_HEIGHT,
-    area512_theme_background_color()
-  );
-}
-
 static int
 compute_corner_inset(int dy, int radius) {
   if (dy <= 0)
@@ -72,12 +48,12 @@ draw_all(Filer *filer) {
 
   adjust_scroll(filer);
 
-  PanelInfo panel_info;
-  build_panel_info(&panel_info);
+  if (!filer->has_key_wait_timed_out)
+    build_panel_info(&filer->panel_info);
 
   uint8_t changed_rows[SCREEN_HEIGHT];
 
-  find_changed_rows(filer, &panel_info, changed_rows);
+  find_changed_rows(filer, changed_rows);
 
   int draw_background = 1;
   int background_failed = 0;
@@ -139,7 +115,7 @@ draw_all(Filer *filer) {
         HEADER_HEIGHT + row * ROW_HEIGHT,
         filer->top + row,
         row,
-        &panel_info
+        &filer->panel_info
       );
 
       row++;
@@ -150,8 +126,31 @@ draw_all(Filer *filer) {
     draw_frame(filer);
     draw_header(filer);
 
-    if (filer->draws_window_frame)
-      draw_window_frame(filer);
+    if (area512_is_filer_window_open_animation_running())
+      area512_draw_filer_window_open_animation(
+        filer->screen,
+        WINDOW_LEFT - 1,
+        WINDOW_TOP - 1,
+        AREA512_WINDOW_WIDTH + 2,
+        AREA512_WINDOW_HEIGHT + 2
+      );
+    else if (filer->terminal || filer->is_window_open)
+      draw_window_box(
+        filer->screen,
+        WINDOW_LEFT - 1,
+        WINDOW_TOP - 1,
+        AREA512_WINDOW_WIDTH + 2,
+        AREA512_WINDOW_HEIGHT + 2
+      );
+
+    if (area512_is_filer_window_close_animation_running())
+      area512_draw_filer_window_close_animation(
+        filer->screen,
+        WINDOW_LEFT - 1,
+        WINDOW_TOP - 1,
+        AREA512_WINDOW_WIDTH + 2,
+        AREA512_WINDOW_HEIGHT + 2
+      );
 
     area512_screen_push_region(filer->screen);
 
@@ -163,25 +162,26 @@ draw_all(Filer *filer) {
   filer->screen = 0;
   filer->full_redraw = 0;
 
-  save_draw_state(filer, &panel_info);
+  save_draw_state(filer);
 
   filer->drawn.valid = !background_failed;
 }
 
 void
-area512_filer_open_window(Filer *filer) {
-  area512_gfx_set_window(0, 0, 0, 0);
-
-  filer->draws_window_frame = 1;
-
-  draw_all(filer);
-
-  filer->draws_window_frame = 0;
-
+area512_filer_set_gfx_window(void) {
   area512_gfx_set_window(
     WINDOW_LEFT,
     WINDOW_TOP,
     AREA512_WINDOW_WIDTH,
     AREA512_WINDOW_HEIGHT
   );
+}
+
+void
+area512_filer_open_window(Filer *filer) {
+  area512_gfx_set_window(0, 0, 0, 0);
+
+  draw_all(filer);
+
+  area512_filer_set_gfx_window();
 }

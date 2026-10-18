@@ -7,6 +7,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void
+draw_all_on_animation_frame(void *context) {
+  draw_all(context);
+}
+
 void
 open_terminal_session(Filer *filer) {
   Terminal *terminal = (Terminal *)malloc(sizeof(Terminal));
@@ -28,8 +33,10 @@ open_terminal_session(Filer *filer) {
   terminal->completion_match_index = -1;
 
   filer->message[0] = 0;
-
   filer->terminal = terminal;
+
+  area512_start_filer_window_open_animation(draw_all_on_animation_frame, filer);
+
   filer->full_redraw = 1;
 }
 
@@ -87,6 +94,9 @@ close_terminal_session(Filer *filer) {
   free(filer->terminal);
 
   filer->terminal = NULL;
+
+  area512_start_filer_window_close_animation(draw_current_screen, filer);
+
   filer->full_redraw = 1;
 }
 

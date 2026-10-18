@@ -3,9 +3,8 @@
 #include "area512_hal.h"
 #include "area512_repl.h"
 
+#include <stdlib.h>
 #include <string.h>
-
-#include <mrubyc.h>
 
 int
 ensure_byte_capacity(
@@ -22,7 +21,7 @@ ensure_byte_capacity(
   while (new_byte_capacity < required_byte_capacity)
     new_byte_capacity *= 2;
 
-  char *resized_text = (char *)mrbc_raw_realloc(*text, new_byte_capacity);
+  char *resized_text = (char *)realloc(*text, new_byte_capacity);
 
   if (resized_text == NULL)
     return 0;
@@ -134,7 +133,7 @@ read_repl_input_key(void) {
 
 int
 open_repl_line(ReplLine *repl_line) {
-  repl_line->input_line = (char *)mrbc_raw_alloc(16);
+  repl_line->input_line = (char *)malloc(16);
 
   if (repl_line->input_line == NULL)
     return 0;
@@ -149,7 +148,7 @@ open_repl_line(ReplLine *repl_line) {
 
 void
 close_repl_line(ReplLine *repl_line) {
-  mrbc_raw_free(repl_line->input_line);
+  free(repl_line->input_line);
 }
 
 int
