@@ -14,7 +14,8 @@ class ThemeEditor
   SELECTED_INDEX = 4 unless const_defined?(:SELECTED_INDEX)
   BOX_INDEX = 5 unless const_defined?(:BOX_INDEX)
   IMAGE_ROW_INDEX = COLOR_KEYS.length unless const_defined?(:IMAGE_ROW_INDEX)
-  ROW_COUNT = COLOR_KEYS.length + 1 unless const_defined?(:ROW_COUNT)
+  CRT_ROW_INDEX = COLOR_KEYS.length + 1 unless const_defined?(:CRT_ROW_INDEX)
+  ROW_COUNT = COLOR_KEYS.length + 2 unless const_defined?(:ROW_COUNT)
 
   CHANNEL_NAMES = ["R", "G", "B"] unless const_defined?(:CHANNEL_NAMES)
   CHANNEL_SHIFTS = [16, 8, 0] unless const_defined?(:CHANNEL_SHIFTS)
@@ -25,4 +26,5 @@ class ThemeEditor
   SWATCH_X = 72 unless const_defined?(:SWATCH_X)
   SWATCH_WIDTH = 30 unless const_defined?(:SWATCH_WIDTH)
   HEX_X = 110 unless const_defined?(:HEX_X)
+  SCROLLBAR_WIDTH = 2 unless const_defined?(:SCROLLBAR_WIDTH)
 end

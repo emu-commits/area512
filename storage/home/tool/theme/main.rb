@@ -15,6 +15,7 @@ class ThemeEditor
 
   def run
     @row_index = 0
+    @top_row_index = 0
     @channel_index = 0
     @preview = false
     @modified = false

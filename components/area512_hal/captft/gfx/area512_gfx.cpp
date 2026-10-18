@@ -655,11 +655,23 @@ push_sprite(
   x += s_window_x;
   y += s_window_y;
 
-  area512_crt_push(
-    dev, spr, x, y, has_transparent_color, transparent_color,
-    p == s_screen_sprite ? s_screen_destination_first_row - s_screen_buffer_first_row : 0,
-    p == s_screen_sprite ? s_screen_destination_row_count : -1
-  );
+  if (area512_theme_is_crt_enabled())
+    area512_crt_push(
+      dev,
+      spr,
+      x,
+      y,
+      has_transparent_color,
+      transparent_color,
+      p == s_screen_sprite ? s_screen_destination_first_row - s_screen_buffer_first_row : 0,
+      p == s_screen_sprite ? s_screen_destination_row_count : -1
+    );
+
+  else if (has_transparent_color)
+    spr->pushSprite(dev, x, y, transparent_color);
+
+  else
+    spr->pushSprite(dev, x, y);
 
   dev->setClipRect(clip_x, clip_y, clip_width, clip_height);
   dev->waitDMA();
@@ -718,6 +730,43 @@ area512_screen_new(int font_size) {
   return spr;
 }
 
+static bool
+assign_screen_buffer_and_destination_rows(
+  int first_row,
+  int row_count,
+  bool changed
+) {
+
+  int screen_height = area512_gfx_height();
+
+  if (area512_theme_is_crt_enabled()) {
+    Area512CrtRegion region;
+
+    if (!area512_crt_region(first_row, row_count, screen_height, changed, &region))
+      return false;
+
+    s_screen_buffer_first_row = region.source_first;
+    s_screen_buffer_row_count = region.source_count;
+    s_screen_destination_first_row = region.destination_first;
+    s_screen_destination_row_count = region.destination_count;
+
+    return true;
+  }
+
+  if (first_row < 0 || first_row >= screen_height || row_count <= 0)
+    return false;
+
+  if (row_count > screen_height - first_row)
+    row_count = screen_height - first_row;
+
+  s_screen_buffer_first_row = first_row;
+  s_screen_buffer_row_count = row_count;
+  s_screen_destination_first_row = first_row;
+  s_screen_destination_row_count = row_count;
+
+  return true;
+}
+
 int
 area512_screen_begin_region(void *p) {
   lgfx::v1::LGFX_Device *dev = area512_gfx_device();
@@ -740,19 +789,16 @@ area512_screen_begin_region(void *p) {
     (int)(SCREEN_SLOT_BYTE_SIZE /
     ((size_t)screen_width * SPRITE_PIXEL_BYTE_SIZE));
 
-  int destination_row_count = AREA512_SCREEN_REGION_ROW_COUNT;
-
-  if (destination_row_count > screen_height - s_screen_next_row)
-    destination_row_count = screen_height - s_screen_next_row;
-
-  Area512CrtRegion region;
-  if (!area512_crt_region(s_screen_next_row, destination_row_count,
-                          screen_height, false, &region))
+  if (
+    !assign_screen_buffer_and_destination_rows(
+      s_screen_next_row,
+      AREA512_SCREEN_REGION_ROW_COUNT,
+      false
+    )
+  )
     return 0;
-  int source_first_row = region.source_first;
-  int source_row_count = region.source_count;
 
-  if (source_row_count > buffer_row_capacity) {
+  if (s_screen_buffer_row_count > buffer_row_capacity) {
     s_screen_next_row = 0;
     s_screen_buffer_row_count = 0;
     s_screen_destination_row_count = 0;
@@ -763,15 +809,11 @@ area512_screen_begin_region(void *p) {
   s_screen_sprite->setBuffer(
     s_sprite_slots[SCREEN_SLOT_INDEX].buffer,
     screen_width,
-    source_row_count,
+    s_screen_buffer_row_count,
     16
   );
 
-  s_screen_buffer_first_row = source_first_row;
-  s_screen_buffer_row_count = source_row_count;
-  s_screen_destination_first_row = region.destination_first;
-  s_screen_destination_row_count = destination_row_count;
-  s_screen_next_row += destination_row_count;
+  s_screen_next_row += s_screen_destination_row_count;
 
   return 1;
 }
@@ -782,26 +824,17 @@ area512_screen_begin_region_at(void *screen, int first_row, int row_count) {
     screen == nullptr ||
     screen != s_screen_sprite ||
     area512_gfx_device() == nullptr ||
-    row_count <= 0 ||
-    row_count > AREA512_SCREEN_REGION_ROW_COUNT
+    row_count > AREA512_SCREEN_REGION_ROW_COUNT ||
+    !assign_screen_buffer_and_destination_rows(first_row, row_count, true)
   )
-    return 0;
-
-  Area512CrtRegion region;
-  if (!area512_crt_region(first_row, row_count, area512_gfx_height(), true, &region))
     return 0;
 
   s_screen_sprite->setBuffer(
     s_sprite_slots[SCREEN_SLOT_INDEX].buffer,
     area512_gfx_width(),
-    region.source_count,
+    s_screen_buffer_row_count,
     16
   );
-
-  s_screen_buffer_first_row = region.source_first;
-  s_screen_buffer_row_count = region.source_count;
-  s_screen_destination_first_row = region.destination_first;
-  s_screen_destination_row_count = region.destination_count;
 
   return 1;
 }

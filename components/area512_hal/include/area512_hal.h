@@ -197,6 +197,7 @@ uint32_t area512_theme_emphasis_color(void);
 uint32_t area512_theme_border_color(void);
 uint32_t area512_theme_selected_color(void);
 uint32_t area512_theme_box_color(void);
+bool area512_theme_is_crt_enabled(void);
 uint32_t area512_theme_blend_text_color_over_background(int text_color_percent);
 uint32_t area512_theme_blend_selected_color_over_background(int selected_color_percent);
 uint32_t area512_theme_blend_white_over_emphasis_color(int white_percent);

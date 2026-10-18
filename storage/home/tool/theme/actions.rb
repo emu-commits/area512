@@ -25,6 +25,15 @@ class ThemeEditor
 
   def move_row(delta)
     @row_index = (@row_index + delta) % ROW_COUNT
+    scroll_to_selected_row
+  end
+
+  def scroll_to_selected_row
+    if @row_index < @top_row_index
+      @top_row_index = @row_index
+    elsif @row_index >= @top_row_index + visible_row_count
+      @top_row_index = @row_index - visible_row_count + 1
+    end
   end
 
   def move_channel(delta)
@@ -32,7 +41,7 @@ class ThemeEditor
   end
 
   def adjust_channel(delta)
-    return if @row_index == IMAGE_ROW_INDEX
+    return if @row_index >= COLOR_KEYS.length
 
     color = @colors[@row_index]
     channel_value = read_channel(color, @channel_index) + delta
@@ -44,9 +53,16 @@ class ThemeEditor
   def edit_row
     if @row_index == IMAGE_ROW_INDEX
       select_image
+    elsif @row_index == CRT_ROW_INDEX
+      toggle_crt
     else
       input_color
     end
+  end
+
+  def toggle_crt
+    @crt_enabled = !@crt_enabled
+    @modified = true
   end
 
   def input_color

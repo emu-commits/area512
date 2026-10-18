@@ -15,6 +15,7 @@ typedef struct {
   uint32_t border_color;
   uint32_t selected_color;
   uint32_t box_color;
+  bool is_crt_enabled;
 } Theme;
 
 static Theme s_theme = {
@@ -24,6 +25,7 @@ static Theme s_theme = {
   .border_color = 0xF5972D,
   .selected_color = 0xFFD966,
   .box_color = 0x241604,
+  .is_crt_enabled = false,
 };
 
 static uint32_t
@@ -150,6 +152,14 @@ assign_theme_from_line(char *line) {
     return;
   }
 
+  if (strcmp(line, "crt") == 0) {
+    if (strcmp(equal_sign + 1, "on") == 0)
+      s_theme.is_crt_enabled = true;
+    else if (strcmp(equal_sign + 1, "off") == 0)
+      s_theme.is_crt_enabled = false;
+    return;
+  }
+
   uint32_t color;
 
   if (parse_hex_color(equal_sign + 1, &color))
@@ -215,6 +225,11 @@ area512_theme_selected_color(void) {
 uint32_t
 area512_theme_box_color(void) {
   return s_theme.box_color;
+}
+
+bool
+area512_theme_is_crt_enabled(void) {
+  return s_theme.is_crt_enabled;
 }
 
 uint32_t

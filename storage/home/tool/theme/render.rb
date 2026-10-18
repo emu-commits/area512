@@ -13,19 +13,42 @@ class ThemeEditor
     @sprite.fill(Widget.theme_background)
     Widget.header(@sprite, "THEME", @modified ? "modified" : "")
 
-    color_index = 0
-    while color_index < COLOR_KEYS.length
-      draw_color_row(color_index)
-      color_index += 1
+    end_row_index = [@top_row_index + visible_row_count, ROW_COUNT].min
+    row_index = @top_row_index
+    while row_index < end_row_index
+      draw_row(row_index)
+      row_index += 1
     end
-    draw_image_row
+    Widget.scrollbar(
+      @sprite,
+      Display.width - SCROLLBAR_WIDTH,
+      Widget.body_top,
+      visible_row_count * ROW_HEIGHT,
+      @top_row_index,
+      visible_row_count,
+      ROW_COUNT
+    )
 
     Widget.toast(@sprite, @message) if @message
     Widget.footer(@sprite, "hl ch +-[] val ENTER TAB s ESC")
   end
 
+  def visible_row_count
+    Widget.body_height / ROW_HEIGHT
+  end
+
   def row_top(row_index)
-    Widget.body_top + row_index * ROW_HEIGHT
+    Widget.body_top + (row_index - @top_row_index) * ROW_HEIGHT
+  end
+
+  def draw_row(row_index)
+    if row_index == IMAGE_ROW_INDEX
+      draw_image_row
+    elsif row_index == CRT_ROW_INDEX
+      draw_crt_row
+    else
+      draw_color_row(row_index)
+    end
   end
 
   def draw_row_label(row_index, label)
@@ -76,6 +99,16 @@ class ThemeEditor
       SWATCH_X,
       row_top(IMAGE_ROW_INDEX) + 1,
       Widget.clip(@sprite, image_label, Display.width - SWATCH_X - LABEL_X),
+      Widget.theme_text
+    )
+  end
+
+  def draw_crt_row
+    draw_row_label(CRT_ROW_INDEX, "crt")
+    @sprite.text(
+      SWATCH_X,
+      row_top(CRT_ROW_INDEX) + 1,
+      @crt_enabled ? "on" : "off",
       Widget.theme_text
     )
   end
