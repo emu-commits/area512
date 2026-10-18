@@ -80,6 +80,9 @@ esptool.py -c esp32s3 -b 460800 write_flash --flash_mode dio --flash_size 8MB --
 
 # 320x240 ILI9341 panel
 esptool.py -c esp32s3 -b 460800 write_flash --flash_mode dio --flash_size 8MB --flash_freq 80m 0x0 firmware/Area512TFT9341.bin
+
+# T-Deck Plus
+esptool.py -c esp32s3 -b 460800 write_flash --flash_mode dio --flash_size 8MB --flash_freq 80m 0x0 firmware/Area512TDeck.bin
 ```
 
 - Insert a FAT32-formatted microSD card into the Cardputer (it is used to store app data).
@@ -152,6 +155,13 @@ idf.py -B build/tft7789 flash
 # ILI9341 panel
 rake build:tft9341
 idf.py -B build/tft9341 flash
+```
+
+For the T-Deck Plus:
+
+```sh
+rake build:tdeck
+idf.py -B build/tdeck flash
 ```
 
 ## Contributing
