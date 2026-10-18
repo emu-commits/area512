@@ -107,8 +107,7 @@ class Writer
   end
 
   def visible_rows
-    h = Display.height - TOOL_H - STATUS_H - MARGIN * 2 - PAGE_PAD * 2 - 8
-    n = h / LINE_H
+    n = (Widget.body_height - PAGE_PAD * 2) / LINE_H
     n < 1 ? 1 : n
   end
 

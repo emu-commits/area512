@@ -227,6 +227,15 @@ area512_theme_blend_text_color_over_background(int text_color_percent) {
 }
 
 uint32_t
+area512_theme_blend_selected_color_over_background(int selected_color_percent) {
+  return blend_color(
+    s_theme.background_color,
+    s_theme.selected_color,
+    selected_color_percent
+  );
+}
+
+uint32_t
 area512_theme_blend_white_over_emphasis_color(int white_percent) {
   return blend_color(s_theme.emphasis_color, WHITE_COLOR, white_percent);
 }

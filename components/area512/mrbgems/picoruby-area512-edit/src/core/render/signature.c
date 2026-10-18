@@ -4,6 +4,7 @@
 #include <string.h>
 
 #define SIGNATURE_TEXT_START_COLUMN 1
+#define SELECTED_ROW_BACKGROUND_COLOR_PERCENT 50
 
 int
 minimum_signature_value(int first, int second) {
@@ -119,7 +120,9 @@ calculate_maximum_signature_horizontal_scroll_column_count(
 static uint32_t
 pick_signature_row_background(int selected) {
   if (selected)
-    return area512_theme_selected_color();
+    return area512_theme_blend_selected_color_over_background(
+      SELECTED_ROW_BACKGROUND_COLOR_PERCENT
+    );
 
   return area512_theme_box_color();
 }

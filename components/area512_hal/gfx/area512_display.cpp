@@ -52,14 +52,20 @@ area512_display_draw_boot_splash(void) {
   if (delay == 0)
     delay = 1;
 
+  void *line_handle = area512_sprite_new(copy_w, 1);
+
+  if (line_handle == nullptr)
+    return;
+
+  lgfx::v1::LGFX_Sprite *line_sprite =
+    static_cast<lgfx::v1::LGFX_Sprite *>(line_handle);
+
   for (int y = 0; y < copy_h; ++y) {
     const uint8_t *row = bitmap + (src_y + y) * row_bytes + src_x / 8;
 
-    s_display->startWrite();
-
-    s_display->drawBitmap(
-      dst_x,
-      dst_y + y,
+    line_sprite->drawBitmap(
+      0,
+      0,
       row,
       copy_w,
       1,
@@ -67,10 +73,12 @@ area512_display_draw_boot_splash(void) {
       rgb888_to_565(clear_bit_color)
     );
 
-    s_display->endWrite();
+    area512_sprite_push(line_handle, dst_x, dst_y + y);
 
     vTaskDelay(delay);
   }
+
+  area512_sprite_delete(line_handle);
 
   vTaskDelay(pdMS_TO_TICKS(500));
 }

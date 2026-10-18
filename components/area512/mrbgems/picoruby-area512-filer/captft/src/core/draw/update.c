@@ -71,6 +71,7 @@ find_changed_rows(Filer *filer, uint8_t *rows) {
     memset(rows, 1, HEADER_HEIGHT);
 
   if (
+    filer->is_window_open ||
     area512_is_filer_window_open_animation_running() ||
     area512_is_filer_window_close_animation_running()
   )

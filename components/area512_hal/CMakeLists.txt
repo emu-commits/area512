@@ -17,6 +17,7 @@ idf_component_register(
     console/system_metrics.cpp
     ${AREA512_DISPLAY_DIR}gfx/area512_display.cpp
     ${AREA512_DISPLAY_DIR}gfx/area512_gfx.cpp
+    gfx/area512_crt.cpp
     sd/area512_data_path.c
     sd/area512_manifest.c
     sd/area512_sd.c
