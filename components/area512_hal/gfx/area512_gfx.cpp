@@ -22,6 +22,9 @@
 #define AREA512_FILER_FONT (&lgfx::v1::fonts::efontJA_12)
 
 static constexpr int SPRITE_PIXEL_BYTE_SIZE = 2;
+
+static constexpr bool CORE_SHIFTS_GREEN_AND_NARROWS_BLUE = true;
+
 static constexpr int ROW_SLOT_WIDTH = 240;
 static constexpr int ROW_SLOT_HEIGHT = 13;
 static constexpr int ROW_SLOT_COUNT = 2;
@@ -494,6 +497,7 @@ push_sprite(
       spr,
       x,
       y,
+      CORE_SHIFTS_GREEN_AND_NARROWS_BLUE,
       has_transparent_color,
       transparent_color,
       p == s_screen_sprite ? s_screen_destination_first_row - s_screen_buffer_first_row : 0,

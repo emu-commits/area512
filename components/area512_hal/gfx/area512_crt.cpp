@@ -97,13 +97,6 @@ static constexpr int green_bloom_gain = 3;
 static constexpr int white_gain[] = {152, 185, 180};
 static constexpr int black_level[] = {14, 15, 19};
 static constexpr int unlit_stripe_gain[] = {218, 190, 140};
-#if defined(AREA512_EXT_DISPLAY)
-// The Cap TFT's larger pixels make the shifted green and narrowed blue of a
-// stroke read as blur, so its strokes keep their own color.
-static constexpr bool CORE_SHIFTS_GREEN_AND_NARROWS_BLUE = false;
-#else
-static constexpr bool CORE_SHIFTS_GREEN_AND_NARROWS_BLUE = true;
-#endif
 static constexpr int dither[] =
   {0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5};
 
@@ -313,7 +306,7 @@ struct UnclampedPixel {
 
 // entries starts one column left of the output column. unclamped keeps the
 // previous pixel's value, which is reused when all inputs repeat.
-template <int LitComponent, bool Transparent>
+template <int LitComponent, bool Transparent, bool CoreShiftsGreenAndNarrowsBlue>
 __attribute__((always_inline)) static inline void
 filter_pixel(
   const ColumnEntry *entries,
@@ -350,7 +343,7 @@ filter_pixel(
     if ((center & 0xffffff) == 0) {
       unclamped->red = red_halo;
       unclamped->green =
-        (CORE_SHIFTS_GREEN_AND_NARROWS_BLUE ? left_green / 2 : 0) + green_halo;
+        (CoreShiftsGreenAndNarrowsBlue ? left_green / 2 : 0) + green_halo;
       unclamped->blue = 0;
     } else {
       const uint32_t right =
@@ -373,9 +366,9 @@ filter_pixel(
       unclamped->red = red * tint[0] / 256 + red_halo * (255 - red) / 255 +
                        black_level[0];
       const uint32_t core_green =
-        CORE_SHIFTS_GREEN_AND_NARROWS_BLUE ? (green + left_green) / 2 : green;
+        CoreShiftsGreenAndNarrowsBlue ? (green + left_green) / 2 : green;
       const uint32_t core_blue =
-        CORE_SHIFTS_GREEN_AND_NARROWS_BLUE ? (narrow_blue * 3 + blue) / 4 : blue;
+        CoreShiftsGreenAndNarrowsBlue ? (narrow_blue * 3 + blue) / 4 : blue;
       unclamped->green = core_green * tint[1] / 256 +
                          green_halo * (255 - green) / 255 + black_level[1];
       unclamped->blue = core_blue * tint[2] / 256 + black_level[2];
@@ -396,7 +389,7 @@ filter_pixel(
   *output = (uint16_t)(high_byte | low_byte << 8);
 }
 
-template <bool Transparent>
+template <bool Transparent, bool CoreShiftsGreenAndNarrowsBlue>
 static void
 filter_pixel_at_phase(
   int phase,
@@ -406,15 +399,21 @@ filter_pixel_at_phase(
   uint16_t *output
 ) {
   if (phase == 0)
-    filter_pixel<0, Transparent>(entries, red_blue_dither, unclamped, output);
+    filter_pixel<0, Transparent, CoreShiftsGreenAndNarrowsBlue>(
+      entries, red_blue_dither, unclamped, output
+    );
   else if (phase == 1)
-    filter_pixel<1, Transparent>(entries, red_blue_dither, unclamped, output);
+    filter_pixel<1, Transparent, CoreShiftsGreenAndNarrowsBlue>(
+      entries, red_blue_dither, unclamped, output
+    );
   else
-    filter_pixel<2, Transparent>(entries, red_blue_dither, unclamped, output);
+    filter_pixel<2, Transparent, CoreShiftsGreenAndNarrowsBlue>(
+      entries, red_blue_dither, unclamped, output
+    );
 }
 
 // red_blue_dithers holds the dither of every output column.
-template <bool Transparent>
+template <bool Transparent, bool CoreShiftsGreenAndNarrowsBlue>
 __attribute__((noinline)) static void
 filter_row(
   const ColumnEntry *entries,
@@ -427,28 +426,28 @@ filter_row(
   int column = 0;
   int phase = first_phase;
   for (; column < column_count && phase != 0; ++column) {
-    filter_pixel_at_phase<Transparent>(
+    filter_pixel_at_phase<Transparent, CoreShiftsGreenAndNarrowsBlue>(
       phase, entries + column, &red_blue_dithers[column], &unclamped,
       output + column
     );
     phase = phase == 2 ? 0 : phase + 1;
   }
   for (; column + 3 <= column_count; column += 3) {
-    filter_pixel<0, Transparent>(
+    filter_pixel<0, Transparent, CoreShiftsGreenAndNarrowsBlue>(
       entries + column, &red_blue_dithers[column], &unclamped,
       output + column
     );
-    filter_pixel<1, Transparent>(
+    filter_pixel<1, Transparent, CoreShiftsGreenAndNarrowsBlue>(
       entries + column + 1, &red_blue_dithers[column + 1], &unclamped,
       output + column + 1
     );
-    filter_pixel<2, Transparent>(
+    filter_pixel<2, Transparent, CoreShiftsGreenAndNarrowsBlue>(
       entries + column + 2, &red_blue_dithers[column + 2], &unclamped,
       output + column + 2
     );
   }
   for (phase = 0; column < column_count; ++column, ++phase) {
-    filter_pixel_at_phase<Transparent>(
+    filter_pixel_at_phase<Transparent, CoreShiftsGreenAndNarrowsBlue>(
       phase, entries + column, &red_blue_dithers[column], &unclamped,
       output + column
     );
@@ -505,6 +504,7 @@ push_rows(
   int height,
   int x,
   int y,
+  bool core_shifts_green_and_narrows_blue,
   uint16_t key,
   int first_row,
   int end_row
@@ -609,10 +609,16 @@ push_rows(
             << (column * 8);
         for (int word = 0; word < (end - start + 3) / 4; ++word)
           dither_words[word] = dither_pattern;
-        filter_row<Transparent>(
-          entries, end - start, (screen_x % 3 + 3) % 3,
-          reinterpret_cast<const uint8_t *>(dither_words), output
-        );
+        if (core_shifts_green_and_narrows_blue)
+          filter_row<Transparent, true>(
+            entries, end - start, (screen_x % 3 + 3) % 3,
+            reinterpret_cast<const uint8_t *>(dither_words), output
+          );
+        else
+          filter_row<Transparent, false>(
+            entries, end - start, (screen_x % 3 + 3) % 3,
+            reinterpret_cast<const uint8_t *>(dither_words), output
+          );
       }
       if (!Transparent) {
         // Rows filtered while the previous row is still being sent wait in
@@ -649,6 +655,7 @@ area512_crt_push(
   lgfx::LGFX_Sprite *sprite,
   int x,
   int y,
+  bool core_shifts_green_and_narrows_blue,
   bool transparent,
   uint32_t transparent_color,
   int first_row,
@@ -687,11 +694,13 @@ area512_crt_push(
   display->startWrite();
   if (transparent)
     push_rows<true>(
-      display, pixels, width, height, x, y, key, first_row, end_row
+      display, pixels, width, height, x, y,
+      core_shifts_green_and_narrows_blue, key, first_row, end_row
     );
   else
     push_rows<false>(
-      display, pixels, width, height, x, y, key, first_row, end_row
+      display, pixels, width, height, x, y,
+      core_shifts_green_and_narrows_blue, key, first_row, end_row
     );
   display->endWrite();
 }

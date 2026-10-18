@@ -23,6 +23,12 @@ void area512_gfx_show_bitmap(const void *bitmap, int line_delay_milliseconds);
 // Pair each successful begin with end. The panel keeps its contents after end.
 int area512_internal_display_begin(void);
 void area512_internal_display_end(void);
+// Drawing between area512_internal_display_begin_region() and
+// area512_internal_display_push_region() uses screen coordinates; rows outside
+// the band are clipped away. Draw the whole screen for every band until
+// begin_region returns 0.
+int area512_internal_display_begin_region(void);
+void area512_internal_display_push_region(void);
 int area512_internal_display_width(void);
 int area512_internal_display_height(void);
 void area512_internal_display_fill_rect(

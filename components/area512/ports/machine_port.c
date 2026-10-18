@@ -62,7 +62,7 @@ volatile int sigint_status = MACHINE_SIG_NONE;
 #define PICORB_STDIN_BUFFER_SIZE 1024
 #endif
 
-#define STDIN_READER_TASK_STACK_SIZE 4096
+#define STDIN_READER_TASK_STACK_SIZE 8192
 
 static uint8_t
   s_stdin_buffer_memory[sizeof(RingBuffer) + PICORB_STDIN_BUFFER_SIZE]

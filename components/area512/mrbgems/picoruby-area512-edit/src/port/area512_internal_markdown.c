@@ -288,6 +288,19 @@ draw_internal_markdown(
     draw_internal_markdown_error();
 }
 
+static void
+draw_internal_markdown_in_regions(void) {
+  while (area512_internal_display_begin_region()) {
+    draw_internal_markdown(
+      &is_internal_markdown_shown,
+      &is_internal_markdown_end_of_file_read,
+      &internal_markdown_next_page_top_row
+    );
+
+    area512_internal_display_push_region();
+  }
+}
+
 static int
 measure_previous_internal_markdown_page_top_row(void) {
   FILE *file = fopen(resolved_path, "rb");
@@ -364,19 +377,19 @@ show_internal_markdown(const char *path) {
   ) {
 
     is_internal_markdown_shown = 0;
-    draw_internal_markdown_error();
+
+    while (area512_internal_display_begin_region()) {
+      draw_internal_markdown_error();
+      area512_internal_display_push_region();
+    }
+
     area512_internal_display_end();
 
     return 0;
   }
 
   internal_markdown_page_top_row = 0;
-
-  draw_internal_markdown(
-    &is_internal_markdown_shown,
-    &is_internal_markdown_end_of_file_read,
-    &internal_markdown_next_page_top_row
-  );
+  draw_internal_markdown_in_regions();
 
   area512_internal_display_end();
 
@@ -393,12 +406,7 @@ show_next_internal_markdown_page(void) {
 
   if (is_internal_markdown_shown && !is_internal_markdown_end_of_file_read) {
     internal_markdown_page_top_row = internal_markdown_next_page_top_row;
-
-    draw_internal_markdown(
-      &is_internal_markdown_shown,
-      &is_internal_markdown_end_of_file_read,
-      &internal_markdown_next_page_top_row
-    );
+    draw_internal_markdown_in_regions();
   }
 
   area512_internal_display_end();
@@ -416,11 +424,7 @@ show_previous_internal_markdown_page(void) {
     internal_markdown_page_top_row =
       measure_previous_internal_markdown_page_top_row();
 
-    draw_internal_markdown(
-      &is_internal_markdown_shown,
-      &is_internal_markdown_end_of_file_read,
-      &internal_markdown_next_page_top_row
-    );
+    draw_internal_markdown_in_regions();
   }
 
   area512_internal_display_end();
@@ -436,13 +440,17 @@ hide_internal_markdown(void) {
   int display_pixel_width = area512_internal_display_width();
   int display_pixel_height = area512_internal_display_height();
 
-  area512_internal_display_fill_rect(
-    0,
-    0,
-    display_pixel_width,
-    display_pixel_height,
-    area512_theme_background_color()
-  );
+  while (area512_internal_display_begin_region()) {
+    area512_internal_display_fill_rect(
+      0,
+      0,
+      display_pixel_width,
+      display_pixel_height,
+      area512_theme_background_color()
+    );
+
+    area512_internal_display_push_region();
+  }
 
   area512_internal_display_end();
 }

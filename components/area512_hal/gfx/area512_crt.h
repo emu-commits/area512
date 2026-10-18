@@ -28,6 +28,7 @@ void area512_crt_push(
   lgfx::LGFX_Sprite *sprite,
   int x,
   int y,
+  bool core_shifts_green_and_narrows_blue,
   bool transparent = false,
   uint32_t transparent_color = 0,
   int first_row = 0,
