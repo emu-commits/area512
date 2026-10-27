@@ -15,9 +15,23 @@ Controls the device display.
 
 - `Display.width()`
 - `Display.height()`
+- `Display.screen_width()`, `Display.screen_height()`
+- `Display.full_screen()`
 - `Display.fill_screen(color)`
 - `Display.set_brightness(brightness)`
 - `Display.show_header_image(path, hold_milliseconds=1000)`
+
+`width()` and `height()` report the area the app draws on. On the 320x240
+display builds the filer runs each app in a 240x135 window, so they report
+240x135 there too. `screen_width()` and `screen_height()` always report the
+whole display. `full_screen()` lets the app draw on the whole display until it
+returns; it does nothing when there is no window. Call it before creating
+screen-sized sprites:
+
+```python
+if Display.screen_width() > Display.width():
+    Display.full_screen()
+```
 
 ## Sprite
 
