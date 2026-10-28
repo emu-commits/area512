@@ -143,6 +143,12 @@ void area512_screen_push_region(void *p);
 
 int area512_gfx_width(void);
 int area512_gfx_height(void);
+// The physical display, ignoring any window the filer has set for the app.
+int area512_gfx_screen_width(void);
+int area512_gfx_screen_height(void);
+// Let the running app draw on the whole display. The filer sets its window
+// again when the app returns. Does nothing when no window is set.
+void area512_gfx_full_screen(void);
 void area512_gfx_fill_screen(uint32_t color);
 void area512_gfx_set_brightness(int brightness);
 int area512_gfx_show_header_image(const char *path, int hold_milliseconds);
